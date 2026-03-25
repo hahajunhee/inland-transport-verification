@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}정산 검증 - 내륙운송정산검증{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">정산 검증</h1>
+</div>
+
+<!-- 업로드 -->
+<div class="card">
+  <h2 class="card-title">엑셀 파일 업로드</h2>
+  <div id="drop-zone" class="drop-zone">
+    <div class="drop-icon">📂</div>
+    <div class="drop-text">엑셀 파일을 여기에 드래그하거나 클릭하여 선택</div>
+    <div class="drop-sub">지원 형식: .xlsx, .xls</div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" />
+  </div>
+  <div id="file-selected" class="file-selected" style="display:none">
+    <span id="file-name"></span>
+    <button class="btn btn-primary" id="upload-btn" onclick="uploadFile()">검증 시작</button>
+    <button class="btn btn-outline" onclick="resetUpload()">취소</button>
+  </div>
+  <div id="upload-progress" style="display:none">
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="progress-text" id="progress-text">처리 중...</div>
+  </div>
+  <div id="upload-error" class="alert alert-error" style="display:none"></div>
+</div>
+
+<!-- 세션 선택 -->
+<div class="card">
+  <div class="card-header-row">
+    <h2 class="card-title">이전 검증 세션</h2>
+    <select id="session-select" onchange="loadSession(this.value)">
+      <option value="">세션 선택...</option>
+    </select>
+  </div>
+</div>
+
+<!-- 요약 -->
+<div id="summary-section" style="display:none">
+  <div class="card">
+    <h2 class="card-title">검증 요약 <span id="summary-filename" class="filename-badge"></span></h2>
+    <div class="summary-grid">
+      <div class="summary-block">
+        <div class="summary-label">총 건수</div>
+        <div class="summary-value" id="s-total">-</div>
+      </div>
+      <div class="summary-block summary-ok">
+        <div class="summary-label">TRKV</div>
+        <div class="summary-counts">
+          <span class="badge badge-ok" id="s-trkv-pass">-</span>
+          <span class="badge badge-diff" id="s-trkv-fail">-</span>
+          <span class="badge badge-no-rate" id="s-trkv-no-rate">-</span>
+        </div>
+      </div>
+      <div class="summary-block">
+        <div class="summary-label">보관료</div>
+        <div class="summary-counts">
+          <span class="badge badge-ok" id="s-storage-pass">-</span>
+          <span class="badge badge-diff" id="s-storage-fail">-</span>
+          <span class="badge badge-no-rate" id="s-storage-no-rate">-</span>
+        </div>
+      </div>
+      <div class="summary-block">
+        <div class="summary-label">상하차료</div>
+        <div class="summary-counts">
+          <span class="badge badge-ok" id="s-handling-pass">-</span>
+          <span class="badge badge-diff" id="s-handling-fail">-</span>
+          <span class="badge badge-no-rate" id="s-handling-no-rate">-</span>
+        </div>
+      </div>
+      <div class="summary-block">
+        <div class="summary-label">셔틀비용</div>
+        <div class="summary-counts">
+          <span class="badge badge-ok" id="s-shuttle-pass">-</span>
+          <span class="badge badge-diff" id="s-shuttle-fail">-</span>
+          <span class="badge badge-no-rate" id="s-shuttle-no-rate">-</span>
+        </div>
+      </div>
+      <div class="summary-block summary-diff">
+        <div class="summary-label">차이 총액</div>
+        <div class="summary-value" id="s-total-diff">-</div>
+      </div>
+    </div>
+    <div class="badge-legend">
+      <span class="badge badge-ok">OK/SKIP</span> 정상&nbsp;&nbsp;
+      <span class="badge badge-diff">DIFF</span> 차이&nbsp;&nbsp;
+      <span class="badge badge-no-rate">NO_RATE</span> 요율없음
+    </div>
+  </div>
+
+  <!-- 결과 테이블 -->
+  <div class="card">
+    <div class="card-header-row">
+      <h2 class="card-title">검증 결과</h2>
+      <div class="filter-row">
+        <button class="btn btn-sm btn-outline filter-btn active" data-filter="ALL" onclick="setFilter('ALL', this)">전체</button>
+        <button class="btn btn-sm btn-diff filter-btn" data-filter="DIFF" onclick="setFilter('DIFF', this)">DIFF만</button>
+        <button class="btn btn-sm btn-no-rate filter-btn" data-filter="NO_RATE" onclick="setFilter('NO_RATE', this)">NO_RATE만</button>
+        <button class="btn btn-sm btn-diff filter-btn" data-filter="DIFF_OR_NO_RATE" onclick="setFilter('DIFF_OR_NO_RATE', this)">이상있음</button>
+        <button class="btn btn-sm btn-primary" onclick="exportExcel()">엑셀 다운로드</button>
+      </div>
+    </div>
+
+    <div class="table-wrapper result-table-wrapper">
+      <table class="data-table result-table">
+        <thead>
+          <tr>
+            <th rowspan="2">행#</th>
+            <th rowspan="2">컨테이너번호</th>
+            <th rowspan="2">운송일자</th>
+            <th rowspan="2">픽업지</th>
+            <th rowspan="2">ODCY</th>
+            <th rowspan="2">도착지</th>
+            <th rowspan="2">컨테이너유형</th>
+            <th colspan="4" class="th-group th-trkv">TRKV</th>
+            <th colspan="4" class="th-group th-storage">보관료</th>
+            <th colspan="4" class="th-group th-handling">상하차료</th>
+            <th colspan="4" class="th-group th-shuttle">셔틀비용</th>
+            <th rowspan="2">종합</th>
+          </tr>
+          <tr>
+            <th class="th-trkv">청구</th><th class="th-trkv">예상</th><th class="th-trkv">차이</th><th class="th-trkv">상태</th>
+            <th class="th-storage">청구</th><th class="th-storage">예상</th><th class="th-storage">차이</th><th class="th-storage">상태</th>
+            <th class="th-handling">청구</th><th class="th-handling">예상</th><th class="th-handling">차이</th><th class="th-handling">상태</th>
+            <th class="th-shuttle">청구</th><th class="th-shuttle">예상</th><th class="th-shuttle">차이</th><th class="th-shuttle">상태</th>
+          </tr>
+        </thead>
+        <tbody id="results-tbody">
+          <tr><td colspan="23" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="pagination" class="pagination"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/verification.js"></script>
+{% endblock %}

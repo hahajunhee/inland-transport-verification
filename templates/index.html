@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}대시보드 - 내륙운송정산검증{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">대시보드</h1>
+</div>
+
+<!-- 요약 카드 -->
+<div class="stat-cards">
+  <div class="stat-card">
+    <div class="stat-label">등록된 요율</div>
+    <div class="stat-value">{{ rate_count }}</div>
+    <a href="/rates" class="stat-link">요율 관리 &rarr;</a>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">검증 세션</div>
+    <div class="stat-value">{{ session_count }}</div>
+    <a href="/verification" class="stat-link">정산 검증 &rarr;</a>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">TRKV 구간 요율</div>
+    <div class="stat-value">{{ trkv_route_count }}</div>
+    <a href="/trkv" class="stat-link">TRKV 설정 &rarr;</a>
+  </div>
+  <div class="stat-card {% if trkv_tier_set < 8 %}stat-card-warn{% endif %}">
+    <div class="stat-label">컨테이너 티어 설정</div>
+    <div class="stat-value">{{ trkv_tier_set }} <span style="font-size:16px;color:#888">/ 8</span></div>
+    {% if trkv_tier_set < 8 %}
+    <a href="/trkv#tier" class="stat-link" style="color:#f59e0b">설정 필요 &rarr;</a>
+    {% else %}
+    <a href="/trkv" class="stat-link">설정 완료 ✓</a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- 데이터 백업 / 복원 -->
+<div class="card" style="margin-bottom:16px">
+  <h2 class="card-title">데이터 백업 / 복원</h2>
+  <p class="card-desc">등록된 모든 요율(TRKV 포트매핑·구간요율·컨테이너 티어, 일반 요율)을 JSON 파일로 내보내거나 불러옵니다.<br>
+  다른 PC로 요율을 이전할 때 사용하세요.</p>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px">
+    <a href="/api/backup" class="btn btn-outline">📥 요율 백업 (JSON 다운로드)</a>
+    <label class="btn btn-outline" style="cursor:pointer;margin:0">
+      📤 요율 복원 (JSON 업로드)
+      <input type="file" id="restore-file" accept=".json" style="display:none" onchange="restoreBackup()" />
+    </label>
+    <span id="restore-msg" style="font-size:13px;display:none"></span>
+  </div>
+</div>
+
+<!-- 최근 검증 내역 -->
+<div class="card">
+  <h2 class="card-title">최근 검증 내역</h2>
+  {% if recent_sessions %}
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>파일명</th>
+          <th>업로드일시</th>
+          <th>총건수</th>
+          <th>TRKV</th>
+          <th>보관료</th>
+          <th>상하차료</th>
+          <th>셔틀비용</th>
+          <th>차이총액</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in recent_sessions %}
+        <tr>
+          <td>{{ s.id }}</td>
+          <td>{{ s.filename }}</td>
+          <td>{{ s.uploaded_at.strftime('%Y-%m-%d %H:%M') if s.uploaded_at else '-' }}</td>
+          <td>{{ s.total_rows }}</td>
+          <td>
+            <span class="badge badge-ok">{{ s.trkv_pass }}</span>
+            <span class="badge badge-diff">{{ s.trkv_fail }}</span>
+            <span class="badge badge-no-rate">{{ s.trkv_no_rate }}</span>
+          </td>
+          <td>
+            <span class="badge badge-ok">{{ s.storage_pass }}</span>
+            <span class="badge badge-diff">{{ s.storage_fail }}</span>
+            <span class="badge badge-no-rate">{{ s.storage_no_rate }}</span>
+          </td>
+          <td>
+            <span class="badge badge-ok">{{ s.handling_pass }}</span>
+            <span class="badge badge-diff">{{ s.handling_fail }}</span>
+            <span class="badge badge-no-rate">{{ s.handling_no_rate }}</span>
+          </td>
+          <td>
+            <span class="badge badge-ok">{{ s.shuttle_pass }}</span>
+            <span class="badge badge-diff">{{ s.shuttle_fail }}</span>
+            <span class="badge badge-no-rate">{{ s.shuttle_no_rate }}</span>
+          </td>
+          <td class="money {% if s.total_diff > 0 %}diff-amount{% endif %}">
+            {{ '{:,.0f}'.format(s.total_diff) }}원
+          </td>
+          <td>
+            <a href="/verification?session={{ s.id }}" class="btn btn-sm btn-outline">보기</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty-msg">아직 검증 내역이 없습니다. <a href="/verification">정산 검증</a>을 시작해보세요.</p>
+  {% endif %}
+</div>
+
+<style>
+.stat-card-warn { border-left: 4px solid #f59e0b !important; }
+</style>
+
+<script>
+async function restoreBackup() {
+  const file = document.getElementById("restore-file").files[0];
+  if (!file) return;
+  if (!confirm("현재 저장된 모든 요율이 백업 파일로 교체됩니다. 계속하시겠습니까?")) return;
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const msgEl = document.getElementById("restore-msg");
+  msgEl.textContent = "복원 중...";
+  msgEl.style.display = "inline";
+  msgEl.style.color = "#888";
+
+  try {
+    const res = await fetch("/api/restore", { method: "POST", body: fd });
+    const data = await res.json();
+    if (res.ok) {
+      const r = data.restored;
+      msgEl.textContent = `✅ 복원 완료 — 요율 ${r.transport_rates}건 · TRKV 구간 ${r.trkv_routes}건 · 포트매핑 ${r.trkv_port_mappings}건`;
+      msgEl.style.color = "#22c55e";
+      setTimeout(() => location.reload(), 2000);
+    } else {
+      msgEl.textContent = `❌ ${data.detail || "복원 실패"}`;
+      msgEl.style.color = "#ef4444";
+    }
+  } catch {
+    msgEl.textContent = "❌ 네트워크 오류";
+    msgEl.style.color = "#ef4444";
+  }
+  document.getElementById("restore-file").value = "";
+}
+</script>
+{% endblock %}

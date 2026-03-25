@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}요율 등록 - 내륙운송정산검증{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">요율 등록 / 관리</h1>
+</div>
+
+<!-- 등록 폼 -->
+<div class="card">
+  <h2 class="card-title" id="form-title">새 요율 등록</h2>
+  <form id="rate-form">
+    <input type="hidden" id="edit-id" value="" />
+    <div class="form-grid">
+      <div class="form-group">
+        <label>비용 유형 <span class="required">*</span></label>
+        <select id="charge_type" required>
+          <option value="">선택하세요</option>
+          <option value="TRKV">TRKV (컨테이너운임)</option>
+          <option value="보관료">보관료</option>
+          <option value="상하차료">상하차료</option>
+          <option value="셔틀비용">셔틀비용</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>픽업지 코드</label>
+        <input type="text" id="pickup_code" placeholder="예: 03077026 (비워두면 전체 적용)" />
+      </div>
+      <div class="form-group">
+        <label>ODCY 코드</label>
+        <input type="text" id="odcy_code" placeholder="예: B015_KOSENAG" />
+      </div>
+      <div class="form-group">
+        <label>도착지 코드</label>
+        <input type="text" id="dest_code" placeholder="예: S013_EZP" />
+      </div>
+      <div class="form-group">
+        <label>컨테이너 유형</label>
+        <select id="container_type">
+          <option value="">전체 (비워두면 전체 적용)</option>
+          <option value="20드라이">20드라이</option>
+          <option value="40드라이">40드라이</option>
+          <option value="45드라이">45드라이</option>
+          <option value="20리퍼">20리퍼</option>
+          <option value="40리퍼">40리퍼</option>
+          <option value="20드라이위험물">20드라이위험물</option>
+          <option value="40드라이위험물">40드라이위험물</option>
+          <option value="20리퍼위험물">20리퍼위험물</option>
+          <option value="40리퍼위험물">40리퍼위험물</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>단가 (원) <span class="required">*</span></label>
+        <input type="number" id="unit_price" placeholder="예: 418800" min="0" required />
+      </div>
+      <div class="form-group form-group-full">
+        <label>비고</label>
+        <input type="text" id="memo" placeholder="메모" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" id="submit-btn">등록</button>
+      <button type="button" class="btn btn-outline" id="cancel-btn" style="display:none">취소</button>
+    </div>
+  </form>
+  <div id="form-msg" class="form-msg" style="display:none"></div>
+</div>
+
+<!-- 필터 + 목록 -->
+<div class="card">
+  <div class="card-header-row">
+    <h2 class="card-title">등록된 요율 목록</h2>
+    <div class="filter-row">
+      <select id="filter-charge" onchange="loadRates()">
+        <option value="">전체 비용 유형</option>
+        <option value="TRKV">TRKV</option>
+        <option value="보관료">보관료</option>
+        <option value="상하차료">상하차료</option>
+        <option value="셔틀비용">셔틀비용</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>비용유형</th>
+          <th>픽업지코드</th>
+          <th>ODCY코드</th>
+          <th>도착지코드</th>
+          <th>컨테이너유형</th>
+          <th>단가 (원)</th>
+          <th>비고</th>
+          <th>등록일</th>
+          <th>관리</th>
+        </tr>
+      </thead>
+      <tbody id="rates-tbody">
+        <tr><td colspan="10" class="empty-msg">불러오는 중...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/rates.js"></script>
+{% endblock %}

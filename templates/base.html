@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}내륙운송정산검증{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">내륙운송정산검증 시스템</div>
+    <div class="nav-links">
+      <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">대시보드</a>
+      <a href="/rates" class="nav-link {% if request.url.path == '/rates' %}active{% endif %}">요율 등록</a>
+      <a href="/trkv" class="nav-link {% if request.url.path == '/trkv' %}active{% endif %}">TRKV 요율</a>
+      <a href="/verification" class="nav-link {% if request.url.path == '/verification' %}active{% endif %}">정산 검증</a>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

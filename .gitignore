@@ -1,0 +1,25 @@
+# 데이터베이스 (요율 데이터 포함 — 깃에 올리지 않음)
+data/*.db
+data/*.db-shm
+data/*.db-wal
+
+# Python 캐시
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# 서버 로그
+*.log
+server.log
+server_err.log
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
