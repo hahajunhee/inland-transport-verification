@@ -41,3 +41,8 @@ def verification_page(request: Request):
 @router.get("/trkv")
 def trkv_page(request: Request):
     return templates.TemplateResponse("trkv.html", {"request": request})
+
+
+@router.get("/mapping")
+def mapping_page(request: Request):
+    return templates.TemplateResponse("mapping.html", {"request": request})

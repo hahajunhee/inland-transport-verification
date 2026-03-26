@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}매핑설정 - 내륙운송정산검증{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">매핑설정</h1>
+  <p class="page-desc">엑셀 지명을 내부 코드(부산신항/부산북항)로 매핑합니다.</p>
+</div>
+
+<!-- ───────────── 통합 업로드 (전체 교체) ───────────── -->
+<div class="card unified-upload-card">
+  <div class="unified-upload-row">
+    <span class="unified-upload-label">통합 양식 (전체 교체)</span>
+    <button type="button" class="btn btn-outline btn-sm" onclick="downloadUnified()">📥 현재 데이터 다운로드</button>
+    <label class="btn btn-primary btn-sm file-label" style="margin:0">
+      📤 업로드 (전체 교체)
+      <input type="file" id="unified-file" accept=".xlsx,.xls" style="display:none" onchange="uploadUnified()" />
+    </label>
+    <span id="unified-msg" class="upload-result" style="display:none"></span>
+  </div>
+</div>
+
+<!-- ───────────── 포트명 매핑 ───────────── -->
+<div class="card">
+  <h2 class="card-title">① 포트명 매핑</h2>
+  <p class="card-desc">엑셀의 픽업지명·도착지명이 부산신항/부산북항 중 어느 쪽인지 등록합니다.</p>
+
+  <form id="pm-form" class="inline-form">
+    <input type="hidden" id="pm-edit-id" value="" />
+    <div class="form-row">
+      <div class="form-group">
+        <label>엑셀 원본 명칭 <span class="required">*</span></label>
+        <input type="text" id="pm-excel-name" placeholder="예: 부산신항터미널, BPTS" required />
+      </div>
+      <div class="form-group">
+        <label>포트 구분 <span class="required">*</span></label>
+        <select id="pm-port-type" required>
+          <option value="">선택하세요</option>
+          <option value="부산신항">부산신항</option>
+          <option value="부산북항">부산북항</option>
+        </select>
+      </div>
+      <div class="form-group form-group-btn">
+        <label>&nbsp;</label>
+        <div class="btn-row">
+          <button type="submit" class="btn btn-primary" id="pm-submit-btn">추가</button>
+          <button type="button" class="btn btn-outline" id="pm-cancel-btn" style="display:none" onclick="cancelPmEdit()">취소</button>
+        </div>
+      </div>
+    </div>
+  </form>
+  <div id="pm-msg" class="form-msg" style="display:none"></div>
+
+  <div class="table-wrapper" style="margin-top:12px">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="pm-check-all" onchange="toggleAllPmCheck(this.checked)" /></th>
+          <th>#</th><th>엑셀 원본 명칭</th><th>포트 구분</th><th>관리</th>
+        </tr>
+      </thead>
+      <tbody id="pm-tbody">
+        <tr><td colspan="5" class="empty-msg">불러오는 중...</td></tr>
+      </tbody>
+      <!-- row-changed highlight -->
+      <style>.row-changed td { background-color:#fef9c3 !important; }</style>
+    </table>
+  </div>
+  <div class="table-action-bar" id="pm-action-bar" style="display:none;margin-top:8px">
+    <button type="button" class="btn btn-danger btn-sm" onclick="deleteSelectedPm()">
+      🗑️ 선택 삭제 (<span id="pm-sel-count">0</span>건)
+    </button>
+  </div>
+</div>
+
+<style>
+.unified-upload-card { background: #f8fafc; border: 1px solid #e2e8f0; }
+.unified-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.unified-upload-label { font-weight: 600; color: #374151; font-size: 14px; margin-right: 4px; }
+.file-label { cursor: pointer; }
+.upload-result { font-size: 13px; font-weight: 500; }
+.upload-result.ok { color: #22c55e; }
+.upload-result.err { color: #ef4444; }
+.table-action-bar { display: flex; align-items: center; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/mapping.js?v=2"></script>
+{% endblock %}

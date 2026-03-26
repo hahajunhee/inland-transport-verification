@@ -7,88 +7,28 @@
   <p class="page-desc">운송구간별 단가와 컨테이너 티어를 설정합니다.</p>
 </div>
 
-<!-- ───────────── 섹션 1: 포트명 매핑 ───────────── -->
-<div class="card">
-  <h2 class="card-title">① 포트명 매핑</h2>
-  <p class="card-desc">엑셀의 픽업지명·도착지명이 부산신항/부산북항 중 어느 쪽인지 등록합니다.</p>
-
-  <!-- 개별 등록 폼 -->
-  <form id="pm-form" class="inline-form">
-    <input type="hidden" id="pm-edit-id" value="" />
-    <div class="form-row">
-      <div class="form-group">
-        <label>엑셀 원본 명칭 <span class="required">*</span></label>
-        <input type="text" id="pm-excel-name" placeholder="예: 부산신항터미널, BPTS" required />
-      </div>
-      <div class="form-group">
-        <label>포트 구분 <span class="required">*</span></label>
-        <select id="pm-port-type" required>
-          <option value="">선택하세요</option>
-          <option value="부산신항">부산신항</option>
-          <option value="부산북항">부산북항</option>
-        </select>
-      </div>
-      <div class="form-group form-group-btn">
-        <label>&nbsp;</label>
-        <div class="btn-row">
-          <button type="submit" class="btn btn-primary" id="pm-submit-btn">추가</button>
-          <button type="button" class="btn btn-outline" id="pm-cancel-btn" style="display:none" onclick="cancelPmEdit()">취소</button>
-        </div>
-      </div>
-    </div>
-  </form>
-  <div id="pm-msg" class="form-msg" style="display:none"></div>
-
-  <!-- 엑셀 업로드 도구바 -->
-  <div class="tool-bar">
-    <button type="button" class="btn btn-outline btn-sm" onclick="downloadPmTemplate()">📥 양식 다운로드</button>
-    <span class="tool-divider">|</span>
-    <label class="btn btn-outline btn-sm file-label">
-      📤 엑셀 업로드
-      <input type="file" id="pm-file" accept=".xlsx,.xls" style="display:none" onchange="uploadPm()" />
+<!-- ───────────── 통합 업로드 (전체 교체) ───────────── -->
+<div class="card unified-upload-card">
+  <div class="unified-upload-row">
+    <span class="unified-upload-label">통합 양식 (전체 교체)</span>
+    <button type="button" class="btn btn-outline btn-sm" onclick="downloadUnified()">📥 현재 데이터 다운로드</button>
+    <label class="btn btn-primary btn-sm file-label" style="margin:0">
+      📤 업로드 (전체 교체)
+      <input type="file" id="unified-file" accept=".xlsx,.xls" style="display:none" onchange="uploadUnified()" />
     </label>
-    <label class="radio-label">
-      <input type="radio" name="pm-mode" value="append" checked /> 추가
-    </label>
-    <label class="radio-label">
-      <input type="radio" name="pm-mode" value="replace" /> 전체 교체
-    </label>
-    <span id="pm-upload-msg" class="upload-result" style="display:none"></span>
-  </div>
-
-  <div class="table-wrapper" style="margin-top:12px">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th><input type="checkbox" id="pm-check-all" onchange="toggleAllPmCheck(this.checked)" /></th>
-          <th>#</th><th>엑셀 원본 명칭</th><th>포트 구분</th><th>관리</th>
-        </tr>
-      </thead>
-      <tbody id="pm-tbody">
-        <tr><td colspan="5" class="empty-msg">불러오는 중...</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="table-action-bar" id="pm-action-bar" style="display:none;margin-top:8px">
-    <button type="button" class="btn btn-danger btn-sm" onclick="deleteSelectedPm()">
-      🗑️ 선택 삭제 (<span id="pm-sel-count">0</span>건)
-    </button>
+    <span id="unified-msg" class="upload-result" style="display:none"></span>
   </div>
 </div>
 
-<!-- ───────────── 섹션 2: 컨테이너 티어 설정 ───────────── -->
+<!-- ───────────── 컨테이너 티어 설정(TRKV티어) ───────────── -->
 <div class="card">
-  <h2 class="card-title">② 컨테이너 티어 설정</h2>
+  <h2 class="card-title">② 컨테이너 티어 설정(TRKV티어)</h2>
   <p class="card-desc">각 컨테이너 조합(Cont.Type × D/G여부)에 티어번호(1~6)를 지정합니다.</p>
 
   <div class="table-wrapper">
     <table class="data-table">
       <thead>
-        <tr>
-          <th>Cont.Type</th>
-          <th>D/G여부</th>
-          <th>티어번호</th>
-        </tr>
+        <tr><th>Cont.Type</th><th>D/G여부</th><th>티어번호</th></tr>
       </thead>
       <tbody id="ct-tbody">
         <tr><td colspan="3" class="empty-msg">불러오는 중...</td></tr>
@@ -97,16 +37,15 @@
   </div>
   <div class="form-actions" style="margin-top:12px">
     <button class="btn btn-primary" onclick="saveContainerTiers()">저장</button>
-    <div id="ct-msg" class="form-msg" style="display:inline-block; margin-left:12px; display:none"></div>
+    <span id="ct-msg" class="form-msg" style="display:none;margin-left:12px"></span>
   </div>
 </div>
 
-<!-- ───────────── 섹션 3: 구간별 요율 ───────────── -->
+<!-- ───────────── 구간별 요율 ───────────── -->
 <div class="card">
   <h2 class="card-title">③ 구간별 요율 (티어1~6 단가)</h2>
   <p class="card-desc">픽업항 → 출하지 → 도착항 구간별로 티어1~6 단가를 등록합니다.</p>
 
-  <!-- 등록/수정 폼 -->
   <form id="rt-form">
     <input type="hidden" id="rt-edit-id" value="" />
     <div class="form-grid trkv-route-grid">
@@ -164,54 +103,28 @@
       <button type="button" class="btn btn-outline" id="rt-cancel-btn" style="display:none" onclick="cancelRtEdit()">취소</button>
     </div>
   </form>
-  <div id="rt-msg" class="form-msg" style="display:none"></div>
+  <span id="rt-msg" class="form-msg" style="display:none"></span>
 
-  <!-- 도구바 -->
   <div class="tool-bar" style="margin-top:12px">
-    <button type="button" class="btn btn-outline btn-sm" onclick="downloadRtTemplate()">📥 양식 다운로드</button>
-    <span class="tool-divider">|</span>
-    <label class="btn btn-outline btn-sm file-label">
-      📤 엑셀 업로드
-      <input type="file" id="rt-file" accept=".xlsx,.xls" style="display:none" onchange="uploadRt()" />
-    </label>
-    <label class="radio-label">
-      <input type="radio" name="rt-mode" value="append" checked /> 추가
-    </label>
-    <label class="radio-label">
-      <input type="radio" name="rt-mode" value="replace" /> 전체 교체
-    </label>
-    <span class="tool-divider">|</span>
     <button type="button" class="btn btn-outline btn-sm" id="rt-edit-mode-btn" onclick="toggleRtEditMode()">✏️ 편집 모드</button>
     <button type="button" class="btn btn-primary btn-sm" id="rt-save-bulk-btn" onclick="saveRtBulk()" style="display:none">💾 일괄 저장</button>
     <button type="button" class="btn btn-outline btn-sm" id="rt-cancel-edit-btn" onclick="cancelRtEditMode()" style="display:none">취소</button>
-    <span id="rt-upload-msg" class="upload-result" style="display:none"></span>
   </div>
 
-  <!-- 선택 삭제 바 -->
   <div class="table-action-bar" id="rt-action-bar" style="display:none;margin-top:8px">
     <button type="button" class="btn btn-danger btn-sm" onclick="deleteSelectedRt()">
       🗑️ 선택 삭제 (<span id="rt-sel-count">0</span>건)
     </button>
   </div>
 
-  <!-- 목록 테이블 -->
   <div class="table-wrapper" style="margin-top:12px">
     <table class="data-table trkv-route-table">
       <thead>
         <tr>
           <th><input type="checkbox" id="rt-check-all" onchange="toggleAllRtCheck(this.checked)" /></th>
-          <th>#</th>
-          <th>픽업항</th>
-          <th>출하지명</th>
-          <th>도착항</th>
-          <th>티어1</th>
-          <th>티어2</th>
-          <th>티어3</th>
-          <th>티어4</th>
-          <th>티어5</th>
-          <th>티어6</th>
-          <th>비고</th>
-          <th>관리</th>
+          <th>#</th><th>픽업항</th><th>출하지명</th><th>도착항</th>
+          <th>티어1</th><th>티어2</th><th>티어3</th><th>티어4</th><th>티어5</th><th>티어6</th>
+          <th>비고</th><th>관리</th>
         </tr>
       </thead>
       <tbody id="rt-tbody">
@@ -222,41 +135,27 @@
 </div>
 
 <style>
-.tool-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-  padding: 8px 0;
-}
-.tool-divider { color: #ccc; font-size: 16px; }
-.file-label { cursor: pointer; margin: 0; }
-.radio-label {
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-}
-.upload-result { font-size: 13px; font-weight: 500; }
-.upload-result.ok { color: #22c55e; }
-.upload-result.err { color: #ef4444; }
-.table-action-bar { display: flex; align-items: center; gap: 8px; }
+.unified-upload-card { background:#f8fafc; border:1px solid #e2e8f0; }
+.unified-upload-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.unified-upload-label { font-weight:600; color:#374151; font-size:14px; }
+.file-label { cursor:pointer; }
+.upload-result { font-size:13px; font-weight:500; }
+.upload-result.ok { color:#22c55e; }
+.upload-result.err { color:#ef4444; }
+.tool-bar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.table-action-bar { display:flex; align-items:center; gap:8px; }
+/* 변경된 행 하이라이트 */
+.row-changed td { background-color:#fef9c3 !important; }
 .trkv-route-table td input,
 .trkv-route-table td select {
-  width: 100%;
-  min-width: 60px;
-  padding: 3px 5px;
-  font-size: 13px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  box-sizing: border-box;
+  width:100%; min-width:60px; padding:3px 5px;
+  font-size:13px; border:1px solid #d1d5db;
+  border-radius:4px; box-sizing:border-box;
 }
-.trkv-route-table td select { min-width: 90px; }
+.trkv-route-table td select { min-width:90px; }
 </style>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/trkv.js"></script>
+<script src="/static/js/trkv.js?v=3"></script>
 {% endblock %}
