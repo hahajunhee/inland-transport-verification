@@ -51,11 +51,7 @@
     <div class="form-grid trkv-route-grid">
       <div class="form-group">
         <label>픽업항 <span class="required">*</span></label>
-        <select id="rt-pickup" required>
-          <option value="">선택</option>
-          <option value="부산신항">부산신항</option>
-          <option value="부산북항">부산북항</option>
-        </select>
+        <input type="text" id="rt-pickup" placeholder="예: 부산신항, 부산북항" list="port-list" required />
       </div>
       <div class="form-group">
         <label>출하지명 <span class="required">*</span></label>
@@ -63,12 +59,12 @@
       </div>
       <div class="form-group">
         <label>도착항 <span class="required">*</span></label>
-        <select id="rt-dest" required>
-          <option value="">선택</option>
-          <option value="부산신항">부산신항</option>
-          <option value="부산북항">부산북항</option>
-        </select>
+        <input type="text" id="rt-dest" placeholder="예: 부산신항, 부산북항" list="port-list" required />
       </div>
+      <datalist id="port-list">
+        <option value="부산신항"></option>
+        <option value="부산북항"></option>
+      </datalist>
       <div class="form-group">
         <label>티어1 (원)</label>
         <input type="number" id="rt-tier1" placeholder="0" min="0" />
@@ -157,5 +153,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/trkv.js?v=3"></script>
+<script src="/static/js/trkv.js?v=4"></script>
 {% endblock %}

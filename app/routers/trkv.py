@@ -163,13 +163,7 @@ def download_unified_template():
         [15, 15, 15, 12, 12, 12, 12, 12, 12, 25],
     )
 
-    dv_a = DataValidation(type="list", formula1='"부산신항,부산북항"', allow_blank=False)
-    ws_rt.add_data_validation(dv_a)
-    dv_a.sqref = "A2:A1000"
-
-    dv_c = DataValidation(type="list", formula1='"부산신항,부산북항"', allow_blank=False)
-    ws_rt.add_data_validation(dv_c)
-    dv_c.sqref = "C2:C1000"
+    # 픽업항/도착항은 어떤 값이든 허용 (DataValidation 없음)
 
     for r in routes:
         ws_rt.append([
@@ -200,8 +194,18 @@ async def upload_unified(file: UploadFile = File(...)):
     content = await file.read()
     try:
         wb = openpyxl.load_workbook(BytesIO(content), data_only=True)
-    except Exception:
-        raise HTTPException(400, detail="올바른 xlsx 파일이 아닙니다.")
+    except Exception as e:
+        raise HTTPException(400, detail=f"올바른 xlsx 파일이 아닙니다: {e}")
+
+    try:
+        return _process_upload(wb)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, detail=f"업로드 처리 중 오류가 발생했습니다: {e}")
+
+
+def _process_upload(wb):
 
     def to_float(v):
         if v is None or str(v).strip() == "":

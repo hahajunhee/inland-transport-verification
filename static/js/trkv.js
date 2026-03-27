@@ -21,8 +21,8 @@ function showMsg(elId, msg, isOk) {
 }
 
 function portBadge(port) {
-  const cls = port === "부산신항" ? "badge-blue" : "badge-purple";
-  return `<span class="badge ${cls}">${port}</span>`;
+  const cls = port === "부산신항" ? "badge-blue" : port === "부산북항" ? "badge-purple" : "badge-gray";
+  return `<span class="badge ${cls}">${port || "-"}</span>`;
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -234,19 +234,9 @@ function renderRoutesEditMode(tbody) {
     <tr data-id="${r.id}" class="${changed}">
       <td><input type="checkbox" class="rt-chk" data-id="${r.id}" onchange="updateRtSelCount()" /></td>
       <td>${i + 1}</td>
-      <td>
-        <select class="rt-inline-pickup">
-          <option value="부산신항" ${r.pickup_port==="부산신항"?"selected":""}>부산신항</option>
-          <option value="부산북항" ${r.pickup_port==="부산북항"?"selected":""}>부산북항</option>
-        </select>
-      </td>
+      <td><input type="text" class="rt-inline-pickup" list="port-list" value="${r.pickup_port || ""}" /></td>
       <td><input type="text" class="rt-inline-dep" value="${r.departure_name}" /></td>
-      <td>
-        <select class="rt-inline-dest">
-          <option value="부산신항" ${r.dest_port==="부산신항"?"selected":""}>부산신항</option>
-          <option value="부산북항" ${r.dest_port==="부산북항"?"selected":""}>부산북항</option>
-        </select>
-      </td>
+      <td><input type="text" class="rt-inline-dest" list="port-list" value="${r.dest_port || ""}" /></td>
       ${[1,2,3,4,5,6].map(n =>
         `<td><input type="number" class="rt-inline-tier" data-tier="${n}" value="${r["tier"+n] ?? ""}" min="0" /></td>`
       ).join("")}
@@ -280,9 +270,9 @@ async function saveRtBulk() {
   rows.forEach(tr => {
     const id = parseInt(tr.dataset.id);
     const body = {
-      pickup_port:    tr.querySelector(".rt-inline-pickup").value,
+      pickup_port:    tr.querySelector(".rt-inline-pickup").value.trim(),
       departure_name: tr.querySelector(".rt-inline-dep").value.trim(),
-      dest_port:      tr.querySelector(".rt-inline-dest").value,
+      dest_port:      tr.querySelector(".rt-inline-dest").value.trim(),
       memo:           tr.querySelector(".rt-inline-memo").value.trim() || null,
     };
     tr.querySelectorAll(".rt-inline-tier").forEach(inp => {
