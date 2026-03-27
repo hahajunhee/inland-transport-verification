@@ -28,16 +28,13 @@ class RateUpdate(BaseModel):
 class RateResponse(BaseModel):
     id: int
     charge_type: str
-    pickup_code: Optional[str]
-    odcy_code: Optional[str]
-    dest_code: Optional[str]
-    container_type: Optional[str]
+    pickup_code: Optional[str] = None
+    odcy_code: Optional[str] = None
+    dest_code: Optional[str] = None
+    container_type: Optional[str] = None
     unit_price: float
-    memo: Optional[str]
-    created_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
+    memo: Optional[str] = None
+    created_at: Optional[datetime] = None
 
 
 # --- Session ---

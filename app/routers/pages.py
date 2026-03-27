@@ -1,23 +1,26 @@
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
 import os
 
-from app.database import get_db
-from app.models import TransportRate, VerificationSession, TRKVRoute, TRKVContainerTier
+from app import data_store
 
 router = APIRouter()
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"))
 
 
 @router.get("/")
-def index(request: Request, db: Session = Depends(get_db)):
-    rate_count = db.query(TransportRate).count()
-    session_count = db.query(VerificationSession).count()
-    recent = db.query(VerificationSession).order_by(VerificationSession.id.desc()).limit(5).all()
-    trkv_route_count = db.query(TRKVRoute).count()
-    # 컨테이너 티어 8개 중 설정된 수
-    trkv_tier_set = db.query(TRKVContainerTier).filter(TRKVContainerTier.tier_number.isnot(None)).count()
+def index(request: Request):
+    rates = data_store.load("transport_rates.json")
+    sessions = data_store.load("verification_sessions.json")
+    routes = data_store.load("trkv_routes.json")
+    tiers = data_store.load("container_tiers.json")
+
+    rate_count = len(rates)
+    session_count = len(sessions)
+    recent = sorted(sessions, key=lambda x: x["id"], reverse=True)[:5]
+    trkv_route_count = len(routes)
+    trkv_tier_set = sum(1 for t in tiers if t.get("tier_number") is not None)
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "rate_count": rate_count,

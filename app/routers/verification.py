@@ -1,20 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from io import BytesIO
 
-from app.database import get_db
-from app.schemas import SessionSummary, ResultRow
-from app.models import VerificationSession, VerificationResult
+from app import data_store
 from app.services.excel_service import parse_settlement_excel, generate_results_excel
 from app.services.verification_service import run_verification
 
 router = APIRouter()
 
 
-@router.post("/upload", response_model=SessionSummary)
-async def upload_and_verify(file: UploadFile = File(...), db: Session = Depends(get_db)):
+@router.post("/upload")
+async def upload_and_verify(file: UploadFile = File(...)):
     if not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(status_code=400, detail="엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.")
 
@@ -27,46 +24,52 @@ async def upload_and_verify(file: UploadFile = File(...), db: Session = Depends(
     if not rows:
         raise HTTPException(status_code=422, detail="유효한 데이터 행이 없습니다.")
 
-    session = run_verification(db, file.filename, rows)
+    session = run_verification(file.filename, rows)
     return session
 
 
-@router.get("/sessions", response_model=List[SessionSummary])
-def list_sessions(db: Session = Depends(get_db)):
-    return db.query(VerificationSession).order_by(VerificationSession.id.desc()).all()
+@router.get("/sessions")
+def list_sessions():
+    sessions = data_store.load("verification_sessions.json")
+    return sorted(sessions, key=lambda x: x["id"], reverse=True)
 
 
-@router.get("/sessions/{session_id}", response_model=SessionSummary)
-def get_session(session_id: int, db: Session = Depends(get_db)):
-    s = db.query(VerificationSession).filter(VerificationSession.id == session_id).first()
+@router.get("/sessions/{session_id}")
+def get_session(session_id: int):
+    sessions = data_store.load("verification_sessions.json")
+    s = next((x for x in sessions if x["id"] == session_id), None)
     if not s:
         raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
     return s
 
 
-@router.get("/sessions/{session_id}/results", response_model=List[ResultRow])
+@router.get("/sessions/{session_id}/results")
 def get_results(
     session_id: int,
-    status_filter: str = None,
+    status_filter: Optional[str] = None,
     skip: int = 0,
     limit: int = 500,
-    db: Session = Depends(get_db),
 ):
-    q = db.query(VerificationResult).filter(VerificationResult.session_id == session_id)
+    results = data_store.load_results(session_id)
+    results = sorted(results, key=lambda x: x.get("row_number", 0))
+
     if status_filter and status_filter != "ALL":
         if status_filter == "DIFF_OR_NO_RATE":
-            q = q.filter(VerificationResult.overall_status.in_(["DIFF", "NO_RATE"]))
+            results = [r for r in results if r.get("overall_status") in ("DIFF", "NO_RATE")]
         else:
-            q = q.filter(VerificationResult.overall_status == status_filter)
-    return q.order_by(VerificationResult.row_number).offset(skip).limit(limit).all()
+            results = [r for r in results if r.get("overall_status") == status_filter]
+
+    return results[skip: skip + limit]
 
 
 @router.get("/sessions/{session_id}/export")
-def export_results(session_id: int, db: Session = Depends(get_db)):
-    session = db.query(VerificationSession).filter(VerificationSession.id == session_id).first()
+def export_results(session_id: int):
+    sessions = data_store.load("verification_sessions.json")
+    session = next((x for x in sessions if x["id"] == session_id), None)
     if not session:
         raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
-    results = db.query(VerificationResult).filter(VerificationResult.session_id == session_id).order_by(VerificationResult.row_number).all()
+    results = data_store.load_results(session_id)
+    results = sorted(results, key=lambda x: x.get("row_number", 0))
     excel_bytes = generate_results_excel(results)
     filename = f"검증결과_{session_id}.xlsx"
     return StreamingResponse(
@@ -77,11 +80,11 @@ def export_results(session_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/sessions/{session_id}")
-def delete_session(session_id: int, db: Session = Depends(get_db)):
-    session = db.query(VerificationSession).filter(VerificationSession.id == session_id).first()
-    if not session:
+def delete_session(session_id: int):
+    sessions = data_store.load("verification_sessions.json")
+    new_sessions = [x for x in sessions if x["id"] != session_id]
+    if len(new_sessions) == len(sessions):
         raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
-    db.query(VerificationResult).filter(VerificationResult.session_id == session_id).delete()
-    db.delete(session)
-    db.commit()
+    data_store.save("verification_sessions.json", new_sessions)
+    data_store.delete_results(session_id)
     return {"ok": True}

@@ -4,13 +4,15 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import os
 
-from app.database import create_tables
+from app import data_store
 from app.routers import rates, verification, pages, trkv, backup
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_tables()
+    # data/ 및 data/results/ 디렉토리 자동 생성
+    data_store.DATA_DIR.mkdir(exist_ok=True)
+    data_store.RESULTS_DIR.mkdir(exist_ok=True)
     yield
 
 

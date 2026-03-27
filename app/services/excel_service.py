@@ -181,23 +181,25 @@ def generate_results_excel(results: list) -> bytes:
     money_cols = {headers.index(h) + 1 for h in headers if "금액" in h}
 
     for r in results:
+        # dict 또는 ORM 객체 모두 지원
+        g = (lambda k: r.get(k) if isinstance(r, dict) else getattr(r, k, None))
         row_data = [
-            r.row_number, r.container_no, r.transport_date,
-            r.pickup_code, r.pickup_name,
-            r.odcy_code, r.odcy_name,
-            r.dest_code, r.dest_name,
-            r.container_type, "Y" if r.dg_flag else "N",
-            r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status,
-            r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status,
-            r.handling_actual, r.handling_expected, r.handling_diff, r.handling_status,
-            r.shuttle_actual, r.shuttle_expected, r.shuttle_diff, r.shuttle_status,
-            r.overall_status,
+            g("row_number"), g("container_no"), g("transport_date"),
+            g("pickup_code"), g("pickup_name"),
+            g("odcy_code"), g("odcy_name"),
+            g("dest_code"), g("dest_name"),
+            g("container_type"), "Y" if g("dg_flag") else "N",
+            g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
+            g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
+            g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),
+            g("shuttle_actual"), g("shuttle_expected"), g("shuttle_diff"), g("shuttle_status"),
+            g("overall_status"),
         ]
         ws.append(row_data)
         excel_row = ws.max_row
 
         # 행 색상 (overall_status 기준)
-        fill = STATUS_FILL.get(r.overall_status or "", FILL_SKIP)
+        fill = STATUS_FILL.get(g("overall_status") or "", FILL_SKIP)
         for col_idx in range(1, len(headers) + 1):
             cell = ws.cell(row=excel_row, column=col_idx)
             cell.fill = fill

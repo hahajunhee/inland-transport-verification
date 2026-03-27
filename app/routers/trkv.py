@@ -1,16 +1,14 @@
 from io import BytesIO
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment, PatternFill
+from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from app.database import get_db
-from app.models import TRKVPortMapping, TRKVRoute
 from app.services import trkv_service
+from app import data_store
 
 router = APIRouter()
 
@@ -48,103 +46,76 @@ class ContainerTierBulk(BaseModel):
 # ─── 포트명 매핑 CRUD ─────────────────────────────────────────────────
 
 @router.get("/port-mappings")
-def list_port_mappings(db: Session = Depends(get_db)):
-    items = trkv_service.get_all_port_mappings(db)
-    return [{"id": i.id, "excel_name": i.excel_name, "port_type": i.port_type} for i in items]
+def list_port_mappings():
+    return trkv_service.get_all_port_mappings()
 
 
 @router.post("/port-mappings", status_code=201)
-def add_port_mapping(body: PortMappingCreate, db: Session = Depends(get_db)):
+def add_port_mapping(body: PortMappingCreate):
     try:
-        obj = trkv_service.create_port_mapping(db, body.excel_name, body.port_type)
-    except Exception:
-        raise HTTPException(status_code=400, detail="이미 등록된 포트명이거나 오류가 발생했습니다.")
-    return {"id": obj.id, "excel_name": obj.excel_name, "port_type": obj.port_type}
+        return trkv_service.create_port_mapping(body.excel_name, body.port_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/port-mappings/{mapping_id}")
-def edit_port_mapping(mapping_id: int, body: PortMappingCreate, db: Session = Depends(get_db)):
-    obj = trkv_service.update_port_mapping(db, mapping_id, body.excel_name, body.port_type)
+def edit_port_mapping(mapping_id: int, body: PortMappingCreate):
+    obj = trkv_service.update_port_mapping(mapping_id, body.excel_name, body.port_type)
     if not obj:
         raise HTTPException(status_code=404, detail="포트 매핑을 찾을 수 없습니다.")
-    return {"id": obj.id, "excel_name": obj.excel_name, "port_type": obj.port_type}
+    return obj
 
 
 @router.delete("/port-mappings/{mapping_id}", status_code=204)
-def remove_port_mapping(mapping_id: int, db: Session = Depends(get_db)):
-    if not trkv_service.delete_port_mapping(db, mapping_id):
+def remove_port_mapping(mapping_id: int):
+    if not trkv_service.delete_port_mapping(mapping_id):
         raise HTTPException(status_code=404, detail="포트 매핑을 찾을 수 없습니다.")
 
 
 # ─── 구간요율 CRUD ─────────────────────────────────────────────────────
 
 @router.get("/routes")
-def list_routes(db: Session = Depends(get_db)):
-    items = trkv_service.get_all_routes(db)
-    return [
-        {
-            "id": r.id,
-            "pickup_port": r.pickup_port,
-            "departure_name": r.departure_name,
-            "dest_port": r.dest_port,
-            "tier1": r.tier1, "tier2": r.tier2, "tier3": r.tier3,
-            "tier4": r.tier4, "tier5": r.tier5, "tier6": r.tier6,
-            "memo": r.memo,
-        }
-        for r in items
-    ]
+def list_routes():
+    return trkv_service.get_all_routes()
 
 
 @router.post("/routes", status_code=201)
-def add_route(body: RouteCreate, db: Session = Depends(get_db)):
-    obj = trkv_service.create_route(db, body.model_dump())
-    return {"id": obj.id, **body.model_dump()}
+def add_route(body: RouteCreate):
+    return trkv_service.create_route(body.model_dump())
 
 
 @router.put("/routes/{route_id}")
-def edit_route(route_id: int, body: RouteCreate, db: Session = Depends(get_db)):
-    obj = trkv_service.update_route(db, route_id, body.model_dump())
+def edit_route(route_id: int, body: RouteCreate):
+    obj = trkv_service.update_route(route_id, body.model_dump())
     if not obj:
         raise HTTPException(status_code=404, detail="구간 요율을 찾을 수 없습니다.")
-    return {"id": obj.id, "pickup_port": obj.pickup_port, "departure_name": obj.departure_name,
-            "dest_port": obj.dest_port, "tier1": obj.tier1, "tier2": obj.tier2,
-            "tier3": obj.tier3, "tier4": obj.tier4, "tier5": obj.tier5, "tier6": obj.tier6,
-            "memo": obj.memo}
+    return obj
 
 
 @router.delete("/routes/{route_id}", status_code=204)
-def remove_route(route_id: int, db: Session = Depends(get_db)):
-    if not trkv_service.delete_route(db, route_id):
+def remove_route(route_id: int):
+    if not trkv_service.delete_route(route_id):
         raise HTTPException(status_code=404, detail="구간 요율을 찾을 수 없습니다.")
 
 
 # ─── 컨테이너 티어 ───────────────────────────────────────────────────
 
 @router.get("/container-tiers")
-def list_container_tiers(db: Session = Depends(get_db)):
-    items = trkv_service.get_all_container_tiers(db)
-    return [
-        {"id": i.id, "cont_type": i.cont_type, "is_dg": i.is_dg, "tier_number": i.tier_number}
-        for i in items
-    ]
+def list_container_tiers():
+    return trkv_service.get_all_container_tiers()
 
 
 @router.post("/container-tiers/bulk")
-def save_container_tiers(body: ContainerTierBulk, db: Session = Depends(get_db)):
-    items = [i.model_dump() for i in body.items]
-    result = trkv_service.bulk_save_container_tiers(db, items)
-    return [
-        {"id": r.id, "cont_type": r.cont_type, "is_dg": r.is_dg, "tier_number": r.tier_number}
-        for r in result
-    ]
+def save_container_tiers(body: ContainerTierBulk):
+    return trkv_service.bulk_save_container_tiers([i.model_dump() for i in body.items])
 
 
 @router.put("/container-tiers/{tier_id}")
-def edit_container_tier(tier_id: int, tier_number: Optional[int] = None, db: Session = Depends(get_db)):
-    obj = trkv_service.update_container_tier(db, tier_id, tier_number)
+def edit_container_tier(tier_id: int, tier_number: Optional[int] = None):
+    obj = trkv_service.update_container_tier(tier_id, tier_number)
     if not obj:
         raise HTTPException(status_code=404, detail="컨테이너 티어를 찾을 수 없습니다.")
-    return {"id": obj.id, "cont_type": obj.cont_type, "is_dg": obj.is_dg, "tier_number": obj.tier_number}
+    return obj
 
 
 # ─── 통합 엑셀 템플릿 (현재 등록된 데이터 포함) ───────────────────────
@@ -161,10 +132,10 @@ def _style_header(ws, headers: list, col_widths: list):
 
 
 @router.get("/template")
-def download_unified_template(db: Session = Depends(get_db)):
+def download_unified_template():
     """현재 등록된 데이터를 포함한 통합 양식 다운로드 (전체 교체용)"""
-    port_mappings = trkv_service.get_all_port_mappings(db)
-    routes = trkv_service.get_all_routes(db)
+    port_mappings = trkv_service.get_all_port_mappings()
+    routes = trkv_service.get_all_routes()
 
     wb = openpyxl.Workbook()
 
@@ -178,9 +149,8 @@ def download_unified_template(db: Session = Depends(get_db)):
     dv_pm.sqref = "B2:B1000"
 
     for pm in port_mappings:
-        ws_pm.append([pm.excel_name, pm.port_type])
+        ws_pm.append([pm["excel_name"], pm["port_type"]])
 
-    # 데이터가 없으면 예시 행
     if not port_mappings:
         ws_pm.append(["부산신항BPTS", "부산신항"])
         ws_pm.append(["부산북항BPNC", "부산북항"])
@@ -203,9 +173,10 @@ def download_unified_template(db: Session = Depends(get_db)):
 
     for r in routes:
         ws_rt.append([
-            r.pickup_port, r.departure_name, r.dest_port,
-            r.tier1, r.tier2, r.tier3, r.tier4, r.tier5, r.tier6,
-            r.memo,
+            r.get("pickup_port"), r.get("departure_name"), r.get("dest_port"),
+            r.get("tier1"), r.get("tier2"), r.get("tier3"),
+            r.get("tier4"), r.get("tier5"), r.get("tier6"),
+            r.get("memo"),
         ])
 
     if not routes:
@@ -224,10 +195,7 @@ def download_unified_template(db: Session = Depends(get_db)):
 # ─── 통합 업로드 (항상 전체 교체) ────────────────────────────────────
 
 @router.post("/upload")
-async def upload_unified(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-):
+async def upload_unified(file: UploadFile = File(...)):
     """통합 업로드: 내용이 있는 시트를 전체 교체로 처리"""
     content = await file.read()
     try:
@@ -257,27 +225,29 @@ async def upload_unified(
         )
 
         if has_data and "엑셀 원본명" in col_map and "포트 구분" in col_map:
-            # 항상 전체 교체
-            db.query(TRKVPortMapping).delete()
-            db.commit()
+            # 전체 교체
+            data_store.save("port_mappings.json", [])
 
             success, failed = 0, []
+            new_items = []
+            next_id = 1
             for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
                 excel_name = row[col_map["엑셀 원본명"]].value
-                port_type = row[col_map["포트 구분"]].value
+                port_type  = row[col_map["포트 구분"]].value
                 if not excel_name and not port_type:
                     continue
                 if not excel_name or not port_type:
                     failed.append({"row": i, "error": "엑셀 원본명, 포트 구분 모두 필수입니다."})
                     continue
                 excel_name = str(excel_name).strip()
-                port_type = str(port_type).strip()
+                port_type  = str(port_type).strip()
                 if port_type not in ("부산신항", "부산북항"):
                     failed.append({"row": i, "error": f"포트 구분 '{port_type}'은 부산신항 또는 부산북항이어야 합니다."})
                     continue
-                db.add(TRKVPortMapping(excel_name=excel_name, port_type=port_type))
+                new_items.append({"id": next_id, "excel_name": excel_name, "port_type": port_type})
+                next_id += 1
                 success += 1
-            db.commit()
+            data_store.save("port_mappings.json", new_items)
             result["포트명 매핑"] = {"success": success, "failed": failed}
 
     # ── TRKV 구간 요율 시트 ──────────────────────────────────────────
@@ -292,25 +262,27 @@ async def upload_unified(
         )
 
         if has_data and all(c in col_map for c in ["픽업항", "출하지명", "도착항"]):
-            # 항상 전체 교체
-            db.query(TRKVRoute).delete()
-            db.commit()
+            # 전체 교체
+            data_store.save("trkv_routes.json", [])
 
             def gv(row, name):
                 idx = col_map.get(name)
                 return row[idx].value if idx is not None else None
 
             success, failed = 0, []
+            new_routes = []
+            next_id = 1
             for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
-                pickup = gv(row, "픽업항")
+                pickup   = gv(row, "픽업항")
                 departure = gv(row, "출하지명")
-                dest = gv(row, "도착항")
+                dest     = gv(row, "도착항")
                 if not pickup and not departure and not dest:
                     continue
                 if not pickup or not departure or not dest:
                     failed.append({"row": i, "error": "픽업항, 출하지명, 도착항은 필수입니다."})
                     continue
                 data = {
+                    "id": next_id,
                     "pickup_port": str(pickup).strip(),
                     "departure_name": str(departure).strip(),
                     "dest_port": str(dest).strip(),
@@ -322,8 +294,10 @@ async def upload_unified(
                     "tier6": to_float(gv(row, "티어6")),
                     "memo": str(gv(row, "비고") or "").strip() or None,
                 }
-                trkv_service.create_route(db, data)
+                new_routes.append(data)
+                next_id += 1
                 success += 1
+            data_store.save("trkv_routes.json", new_routes)
             result["TRKV 구간 요율"] = {"success": success, "failed": failed}
 
     if not result:
