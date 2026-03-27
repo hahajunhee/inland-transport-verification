@@ -74,7 +74,7 @@
         <tr>
           <td>{{ s.id }}</td>
           <td>{{ s.filename }}</td>
-          <td>{{ s.uploaded_at.strftime('%Y-%m-%d %H:%M') if s.uploaded_at else '-' }}</td>
+          <td>{{ s.uploaded_at[:16].replace('T', ' ') if s.uploaded_at else '-' }}</td>
           <td>{{ s.total_rows }}</td>
           <td>
             <span class="badge badge-ok">{{ s.trkv_pass }}</span>
