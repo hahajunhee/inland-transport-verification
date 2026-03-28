@@ -2,6 +2,7 @@ from datetime import datetime
 from app import data_store
 from app.services.rate_service import find_rate
 from app.services import trkv_service
+from app.services.trkv_service import resolve_port
 
 TOLERANCE = 1.0  # 원 단위 허용 오차
 
@@ -73,10 +74,13 @@ def run_verification(filename: str, rows: list) -> dict:
             "transport_date": row.get("transport_date"),
             "pickup_code": pickup_code,
             "pickup_name": pickup_name,
+            "pickup_port_resolved": resolve_port(pickup_name),
             "odcy_code": odcy_code,
             "odcy_name": row.get("odcy_name"),
+            "departure_name": departure_name,
             "dest_code": dest_code,
             "dest_name": dest_name,
+            "dest_port_resolved": resolve_port(dest_name),
             "container_type": container_type,
             "dg_flag": row.get("dg_flag", False),
         }

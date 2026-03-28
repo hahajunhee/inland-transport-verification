@@ -1,13 +1,17 @@
+/* ─── 정산 검증 페이지 스크립트 ─── */
+
 let currentSessionId = null;
 let currentFilter = "ALL";
 let currentPage = 0;
+let allRows = [];          // 현재 세션+필터의 전체 결과
+let sortState = { col: "row_number", dir: "asc" };
 const PAGE_SIZE = 100;
+const EMPTY_COLS = 27;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
   loadSessionList();
 
-  // URL 파라미터로 세션 자동 로드
   const params = new URLSearchParams(location.search);
   const sid = params.get("session");
   if (sid) loadSession(sid);
@@ -15,27 +19,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ─── 드래그앤드롭 ─────────────────────────────────────────
 function setupDropZone() {
-  const zone = document.getElementById("drop-zone");
+  const zone  = document.getElementById("drop-zone");
   const input = document.getElementById("file-input");
 
   zone.addEventListener("click", () => input.click());
-  zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("drag-over"); });
-  zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
+  zone.addEventListener("dragover",  (e) => { e.preventDefault(); zone.classList.add("drag-over"); });
+  zone.addEventListener("dragleave", ()  => zone.classList.remove("drag-over"));
   zone.addEventListener("drop", (e) => {
     e.preventDefault();
     zone.classList.remove("drag-over");
     if (e.dataTransfer.files.length) selectFile(e.dataTransfer.files[0]);
   });
-  input.addEventListener("change", () => {
-    if (input.files.length) selectFile(input.files[0]);
-  });
+  input.addEventListener("change", () => { if (input.files.length) selectFile(input.files[0]); });
 }
 
 function selectFile(file) {
   document.getElementById("drop-zone").style.display = "none";
   document.getElementById("file-selected").style.display = "flex";
   document.getElementById("file-name").textContent = file.name;
-  document.getElementById("upload-btn").dataset.file = "pending";
   document.getElementById("upload-btn").onclick = () => uploadFile(file);
 }
 
@@ -48,8 +49,7 @@ function resetUpload() {
 
 async function uploadFile(file) {
   if (!file) {
-    const input = document.getElementById("file-input");
-    file = input.files[0];
+    file = document.getElementById("file-input").files[0];
   }
   if (!file) return;
 
@@ -63,7 +63,6 @@ async function uploadFile(file) {
   try {
     const res = await fetch("/api/verification/upload", { method: "POST", body: form });
     document.getElementById("upload-progress").style.display = "none";
-
     if (!res.ok) {
       const err = await res.json();
       showError(err.detail || "업로드 실패");
@@ -128,7 +127,7 @@ function renderSummary(s) {
   diffEl.style.color = diff > 0 ? "#c62828" : "#1e7e34";
 }
 
-// ─── 결과 테이블 ─────────────────────────────────────────
+// ─── 필터 ────────────────────────────────────────────────
 function setFilter(filter, btn) {
   currentFilter = filter;
   currentPage = 0;
@@ -137,70 +136,139 @@ function setFilter(filter, btn) {
   loadResults();
 }
 
+// ─── 결과 로드 (전체 한번에) ─────────────────────────────
 async function loadResults() {
   if (!currentSessionId) return;
-  const skip = currentPage * PAGE_SIZE;
-  const url = `/api/verification/sessions/${currentSessionId}/results?status_filter=${currentFilter}&skip=${skip}&limit=${PAGE_SIZE}`;
+  const url = `/api/verification/sessions/${currentSessionId}/results?status_filter=${currentFilter}&skip=0&limit=99999`;
   const res = await fetch(url);
-  const rows = await res.json();
-  renderResults(rows);
+  allRows = await res.json();
+  applySortAndRender();
 }
 
-function renderResults(rows) {
+// ─── 정렬 ────────────────────────────────────────────────
+function sortBy(col) {
+  if (sortState.col === col) {
+    sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+  } else {
+    sortState.col = col;
+    sortState.dir = "asc";
+  }
+  currentPage = 0;
+  applySortAndRender();
+}
+
+function applySortAndRender() {
+  const sorted = [...allRows].sort((a, b) => {
+    let av = a[sortState.col];
+    let bv = b[sortState.col];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    const na = parseFloat(av), nb = parseFloat(bv);
+    const cmp = (!isNaN(na) && !isNaN(nb))
+      ? na - nb
+      : String(av).localeCompare(String(bv), "ko");
+    return sortState.dir === "asc" ? cmp : -cmp;
+  });
+  renderResults(sorted);
+  updateSortArrows();
+}
+
+function updateSortArrows() {
+  document.querySelectorAll(".sortable-th").forEach(th => {
+    // onclick 에서 정렬 키 추출
+    const match = (th.getAttribute("onclick") || "").match(/sortBy\('([^']+)'\)/);
+    if (!match) return;
+    const key = match[1];
+    const arrow = th.querySelector(".sort-arrow");
+    if (!arrow) return;
+    arrow.textContent = sortState.col === key
+      ? (sortState.dir === "asc" ? " ↑" : " ↓")
+      : " ↕";
+  });
+}
+
+// ─── 결과 테이블 렌더 ────────────────────────────────────
+function renderResults(sorted) {
   const tbody = document.getElementById("results-tbody");
-  if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="23" class="empty-msg">결과가 없습니다.</td></tr>';
+  if (!sorted.length) {
+    tbody.innerHTML = `<tr><td colspan="${EMPTY_COLS}" class="empty-msg">결과가 없습니다.</td></tr>`;
     document.getElementById("pagination").innerHTML = "";
     return;
   }
-  tbody.innerHTML = rows.map(r => {
-    const rowClass = r.overall_status === "DIFF" ? "row-diff" : r.overall_status === "NO_RATE" ? "row-no-rate" : "";
-    return `<tr class="${rowClass}">
-      <td>${r.row_number}</td>
-      <td>${r.container_no || '-'}</td>
-      <td>${r.transport_date || '-'}</td>
-      <td title="${r.pickup_name || ''}">${r.pickup_code || '-'}</td>
-      <td title="${r.odcy_name || ''}">${r.odcy_code || '-'}</td>
-      <td title="${r.dest_name || ''}">${r.dest_code || '-'}</td>
-      <td>${r.container_type || '-'}</td>
-      ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status)}
-      ${chargeCell(r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status)}
-      ${chargeCell(r.handling_actual, r.handling_expected, r.handling_diff, r.handling_status)}
-      ${chargeCell(r.shuttle_actual, r.shuttle_expected, r.shuttle_diff, r.shuttle_status)}
-      <td class="${statusClass(r.overall_status)}">${r.overall_status || '-'}</td>
-    </tr>`;
-  }).join("");
 
-  // 페이지네이션 (단순: 이전/다음)
+  const start    = currentPage * PAGE_SIZE;
+  const pageRows = sorted.slice(start, start + PAGE_SIZE);
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+
+  tbody.innerHTML = pageRows.map(r => renderRow(r)).join("");
+
+  // 페이지네이션
   const pag = document.getElementById("pagination");
   pag.innerHTML = `
     ${currentPage > 0 ? `<button onclick="changePage(-1)">이전</button>` : ""}
-    <button class="active">${currentPage + 1} 페이지</button>
-    ${rows.length === PAGE_SIZE ? `<button onclick="changePage(1)">다음</button>` : ""}
+    <button class="active">${currentPage + 1} / ${totalPages} 페이지 (${sorted.length.toLocaleString()}건)</button>
+    ${currentPage < totalPages - 1 ? `<button onclick="changePage(1)">다음</button>` : ""}
   `;
+}
+
+function renderRow(r) {
+  const rowClass = r.overall_status === "DIFF" ? "row-diff"
+                 : r.overall_status === "NO_RATE" ? "row-no-rate" : "";
+
+  // 매핑된 포트: 원본명과 다를 때 배지 스타일 적용
+  const pickupPort = r.pickup_port_resolved
+    ? `<span class="port-resolved">${r.pickup_port_resolved}</span>`
+    : "-";
+  const destPort = r.dest_port_resolved
+    ? `<span class="port-resolved">${r.dest_port_resolved}</span>`
+    : "-";
+
+  return `<tr class="${rowClass}">
+    <td>${r.row_number}</td>
+    <td>${r.container_no || "-"}</td>
+    <td>${r.transport_date || "-"}</td>
+    <!-- 운송 구간 정보 (7열) -->
+    <td>${r.pickup_name || "-"}</td>
+    <td>${pickupPort}</td>
+    <td>${r.departure_name || "-"}</td>
+    <td title="${r.odcy_name || ""}">${r.odcy_code || r.odcy_name || "-"}</td>
+    <td>${r.dest_name || "-"}</td>
+    <td>${destPort}</td>
+    <td>${r.container_type || "-"}</td>
+    <!-- TRKV -->
+    ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status)}
+    <!-- 보관료 -->
+    ${chargeCell(r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status)}
+    <!-- 상하차료 -->
+    ${chargeCell(r.handling_actual, r.handling_expected, r.handling_diff, r.handling_status)}
+    <!-- 셔틀비용 -->
+    ${chargeCell(r.shuttle_actual, r.shuttle_expected, r.shuttle_diff, r.shuttle_status)}
+    <!-- 종합 -->
+    <td class="${statusClass(r.overall_status)}">${r.overall_status || "-"}</td>
+  </tr>`;
 }
 
 function changePage(delta) {
   currentPage += delta;
-  loadResults();
+  applySortAndRender();
   document.querySelector(".result-table-wrapper").scrollTop = 0;
 }
 
 function chargeCell(actual, expected, diff, status) {
   const sc = statusClass(status);
   const diffStr = diff != null ? (diff >= 0 ? "+" : "") + fmtMoney(diff) : "-";
-  const diffColor = diff > 0.5 ? 'style="color:#c62828"' : diff < -0.5 ? 'style="color:#1a73e8"' : '';
+  const diffColor = diff > 0.5 ? 'style="color:#c62828"' : diff < -0.5 ? 'style="color:#1a73e8"' : "";
   return `
     <td class="money">${fmtMoney(actual)}</td>
-    <td class="money">${expected != null ? fmtMoney(expected) : '-'}</td>
+    <td class="money">${expected != null ? fmtMoney(expected) : "-"}</td>
     <td class="money" ${diffColor}>${diffStr}</td>
-    <td class="${sc}">${status || '-'}</td>
+    <td class="${sc}">${status || "-"}</td>
   `;
 }
 
 function statusClass(s) {
-  const map = { OK: "status-ok", DIFF: "status-diff", NO_RATE: "status-no-rate", SKIP: "status-skip" };
-  return map[s] || "";
+  return { OK: "status-ok", DIFF: "status-diff", NO_RATE: "status-no-rate", SKIP: "status-skip" }[s] || "";
 }
 
 function exportExcel() {

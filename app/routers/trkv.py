@@ -144,10 +144,6 @@ def download_unified_template():
     ws_pm.title = "포트명 매핑"
     _style_header(ws_pm, ["엑셀 원본명", "포트 구분"], [30, 15])
 
-    dv_pm = DataValidation(type="list", formula1='"부산신항,부산북항"', allow_blank=False)
-    ws_pm.add_data_validation(dv_pm)
-    dv_pm.sqref = "B2:B1000"
-
     for pm in port_mappings:
         ws_pm.append([pm["excel_name"], pm["port_type"]])
 
@@ -245,9 +241,6 @@ def _process_upload(wb):
                     continue
                 excel_name = str(excel_name).strip()
                 port_type  = str(port_type).strip()
-                if port_type not in ("부산신항", "부산북항"):
-                    failed.append({"row": i, "error": f"포트 구분 '{port_type}'은 부산신항 또는 부산북항이어야 합니다."})
-                    continue
                 new_items.append({"id": next_id, "excel_name": excel_name, "port_type": port_type})
                 next_id += 1
                 success += 1

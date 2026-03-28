@@ -183,12 +183,30 @@ a:hover { text-decoration: underline; }
 .row-no-rate td { background: #fffef0; }
 
 /* ─── 결과 테이블 그룹 헤더 ─────────────────────────────── */
-.th-group { font-size: 12px; letter-spacing: -.2px; }
-.th-trkv { background: #e8f0fe !important; color: #1a73e8; }
-.th-storage { background: #e6f9f0 !important; color: #1e7e34; }
+.th-group    { font-size: 12px; letter-spacing: -.2px; font-weight: 700; }
+.th-route    { background: #ccfbf1 !important; color: #0f766e; }
+.th-trkv     { background: #e8f0fe !important; color: #1a73e8; }
+.th-storage  { background: #e6f9f0 !important; color: #1e7e34; }
 .th-handling { background: #fef3e8 !important; color: #d96c00; }
-.th-shuttle { background: #f3e8fe !important; color: #7b1fa2; }
-.result-table-wrapper { max-height: 600px; overflow-y: auto; }
+.th-shuttle  { background: #f3e8fe !important; color: #7b1fa2; }
+
+/* ─── 결과 테이블 sticky 2중 헤더 ────────────────────────── */
+.result-table-wrapper { max-height: 600px; overflow-y: auto; overflow-x: auto; }
+.result-table thead tr:nth-child(1) th { position: sticky; top: 0;    z-index: 3; height: 38px; }
+.result-table thead tr:nth-child(2) th { position: sticky; top: 38px; z-index: 2; }
+
+/* ─── 정렬 헤더 ─────────────────────────────────────────── */
+.sortable-th { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable-th:hover { filter: brightness(0.92); }
+.sort-arrow  { font-size: 11px; opacity: 0.6; margin-left: 2px; }
+
+/* ─── 매핑 포트 배지 ────────────────────────────────────── */
+.port-resolved {
+  display: inline-block;
+  background: #99f6e4; color: #0f766e;
+  border-radius: 4px; padding: 1px 6px;
+  font-size: 11px; font-weight: 700;
+}
 
 /* ─── 업로드 존 ──────────────────────────────────────────── */
 .drop-zone {
