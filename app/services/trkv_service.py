@@ -5,7 +5,7 @@ from app import data_store
 # ─── 포트명 매핑 ──────────────────────────────────────────────────────
 
 def resolve_port(name: Optional[str]) -> Optional[str]:
-    """엑셀 포트명 → 부산신항/부산북항. 매핑 없으면 원본 그대로 반환."""
+    """엑셀 포트명 → 포트구분. 매핑 없으면 원본 그대로 반환."""
     if not name:
         return name
     name = name.strip()
@@ -22,7 +22,6 @@ def get_all_port_mappings() -> list:
 
 def create_port_mapping(excel_name: str, port_type: str) -> dict:
     items = data_store.load("port_mappings.json")
-    # 중복 체크
     if any(m["excel_name"] == excel_name.strip() for m in items):
         raise ValueError("이미 등록된 포트명입니다.")
     obj = {
@@ -55,11 +54,63 @@ def delete_port_mapping(mapping_id: int) -> bool:
     return True
 
 
+# ─── 출하지 매핑 ──────────────────────────────────────────────────────
+
+def resolve_departure(name: Optional[str]) -> Optional[str]:
+    """엑셀 출하지명 → 출하지코드. 매핑 없으면 원본 그대로 반환."""
+    if not name:
+        return name
+    name = name.strip()
+    items = data_store.load("departure_mappings.json")
+    for m in items:
+        if m["departure_name"] == name:
+            return m["departure_code"]
+    return name
+
+
+def get_all_departure_mappings() -> list:
+    return sorted(data_store.load("departure_mappings.json"), key=lambda x: x["id"])
+
+
+def create_departure_mapping(departure_name: str, departure_code: str) -> dict:
+    items = data_store.load("departure_mappings.json")
+    if any(m["departure_name"] == departure_name.strip() for m in items):
+        raise ValueError("이미 등록된 출하지명입니다.")
+    obj = {
+        "id": data_store.next_id(items),
+        "departure_name": departure_name.strip(),
+        "departure_code": departure_code.strip(),
+    }
+    items.append(obj)
+    data_store.save("departure_mappings.json", items)
+    return obj
+
+
+def update_departure_mapping(mapping_id: int, departure_name: str, departure_code: str) -> Optional[dict]:
+    items = data_store.load("departure_mappings.json")
+    for i, m in enumerate(items):
+        if m["id"] == mapping_id:
+            items[i]["departure_name"] = departure_name.strip()
+            items[i]["departure_code"] = departure_code.strip()
+            data_store.save("departure_mappings.json", items)
+            return items[i]
+    return None
+
+
+def delete_departure_mapping(mapping_id: int) -> bool:
+    items = data_store.load("departure_mappings.json")
+    new_items = [m for m in items if m["id"] != mapping_id]
+    if len(new_items) == len(items):
+        return False
+    data_store.save("departure_mappings.json", new_items)
+    return True
+
+
 # ─── 구간요율 ─────────────────────────────────────────────────────────
 
 def get_all_routes() -> list:
     items = data_store.load("trkv_routes.json")
-    return sorted(items, key=lambda x: (x.get("pickup_port", ""), x.get("departure_name", ""), x.get("dest_port", "")))
+    return sorted(items, key=lambda x: (x.get("pickup_port", ""), x.get("departure_code", x.get("departure_name", "")), x.get("dest_port", "")))
 
 
 def create_route(data: dict) -> dict:
@@ -138,18 +189,23 @@ def get_trkv_expected(
     """
     TRKV 예상 금액 반환. 설정 누락 시 None 반환 → NO_RATE 처리.
 
-    1. pickup_name / dest_name → 포트 매핑으로 부산신항/부산북항 해석
-    2. (cont_type, dg_raw) → container_tiers.json 에서 tier_number 조회
-    3. (pickup_port, departure_name, dest_port) → trkv_routes.json 조회 후 tier{N} 반환
+    1. pickup_name → resolve_port  → pickup_port
+    2. departure_name → resolve_departure → departure_code
+    3. dest_name  → resolve_port  → dest_port
+    4. (cont_type, dg_raw) → container_tiers → tier_number
+    5. (pickup_port, departure_code, dest_port) → trkv_routes → tier{N} 단가
     """
     # 1. 포트 해석
     pickup_port = resolve_port(pickup_name)
     dest_port   = resolve_port(dest_name)
 
-    # 2. D/G 판단
+    # 2. 출하지 코드 해석
+    departure_code = resolve_departure(departure_name)
+
+    # 3. D/G 판단
     is_dg = str(dg_raw or "").strip().upper() == "X"
 
-    # 3. 컨테이너 티어 조회
+    # 4. 컨테이너 티어 조회
     ct = str(cont_type or "").strip()
     tiers = data_store.load("container_tiers.json")
     tier_row = next(
@@ -161,19 +217,18 @@ def get_trkv_expected(
 
     tier_num = tier_row["tier_number"]  # 1~6
 
-    # 4. 구간요율 조회
-    dep = str(departure_name or "").strip()
+    # 5. 구간요율 조회 (departure_code 기준, 구버전 departure_name 호환)
+    dep = str(departure_code or "").strip()
     routes = data_store.load("trkv_routes.json")
     route = next(
         (r for r in routes
-         if r["pickup_port"] == pickup_port
-         and r["departure_name"] == dep
-         and r["dest_port"] == dest_port),
+         if r.get("pickup_port") == pickup_port
+         and r.get("departure_code", r.get("departure_name", "")) == dep
+         and r.get("dest_port") == dest_port),
         None,
     )
     if not route:
         return None
 
-    # 5. 티어번호에 해당하는 단가 반환
     price = route.get(f"tier{tier_num}")
-    return price  # None이면 NO_RATE
+    return price

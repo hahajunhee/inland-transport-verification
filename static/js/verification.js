@@ -6,7 +6,7 @@ let currentPage = 0;
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
 const PAGE_SIZE = 100;
-const EMPTY_COLS = 27;     // colspan for empty message
+const EMPTY_COLS = 28;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -228,10 +228,11 @@ function renderRow(r) {
     <td>${r.row_number}</td>
     <td>${r.container_no || "-"}</td>
     <td>${r.transport_date || "-"}</td>
-    <!-- 운송 구간 정보 (7열) -->
+    <!-- 운송 구간 정보 (8열) -->
     <td>${r.pickup_name || "-"}</td>
     <td>${pickupPort}</td>
     <td>${r.departure_name || "-"}</td>
+    <td>${r.departure_code_resolved ? `<span class="port-resolved">${r.departure_code_resolved}</span>` : "-"}</td>
     <td title="${r.odcy_name || ""}">${r.odcy_code || r.odcy_name || "-"}</td>
     <td>${r.dest_name || "-"}</td>
     <td>${destPort}</td>

@@ -1,4 +1,4 @@
-/* ─── TRKV 요율 설정 페이지 스크립트 v3 ─── */
+/* ─── TRKV 요율 설정 페이지 스크립트 v5 ─── */
 
 const CONT_TYPES = ["22G1", "22R1", "45G1", "45R1"];
 const DG_OPTIONS = [false, true];
@@ -171,7 +171,7 @@ async function loadRoutes(prevSnapshot) {
           changedRtIds.add(r.id);
         } else {
           // 값이 달라진 행
-          const fields = ["pickup_port","departure_name","dest_port","tier1","tier2","tier3","tier4","tier5","tier6","memo"];
+          const fields = ["pickup_port","departure_code","dest_port","tier1","tier2","tier3","tier4","tier5","tier6","memo"];
           if (fields.some(f => String(r[f] ?? "") !== String(prev[f] ?? ""))) {
             changedRtIds.add(r.id);
           }
@@ -210,7 +210,7 @@ function renderRoutesViewMode(tbody) {
       <td><input type="checkbox" class="rt-chk" data-id="${r.id}" onchange="updateRtSelCount()" /></td>
       <td>${i + 1}</td>
       <td>${portBadge(r.pickup_port)}</td>
-      <td>${r.departure_name}</td>
+      <td>${r.departure_code ?? r.departure_name ?? "-"}</td>
       <td>${portBadge(r.dest_port)}</td>
       <td>${fmt(r.tier1)}</td>
       <td>${fmt(r.tier2)}</td>
@@ -235,7 +235,7 @@ function renderRoutesEditMode(tbody) {
       <td><input type="checkbox" class="rt-chk" data-id="${r.id}" onchange="updateRtSelCount()" /></td>
       <td>${i + 1}</td>
       <td><input type="text" class="rt-inline-pickup" list="port-list" value="${r.pickup_port || ""}" /></td>
-      <td><input type="text" class="rt-inline-dep" value="${r.departure_name}" /></td>
+      <td><input type="text" class="rt-inline-dep" list="dep-code-list" value="${r.departure_code ?? r.departure_name ?? ""}" /></td>
       <td><input type="text" class="rt-inline-dest" list="port-list" value="${r.dest_port || ""}" /></td>
       ${[1,2,3,4,5,6].map(n =>
         `<td><input type="number" class="rt-inline-tier" data-tier="${n}" value="${r["tier"+n] ?? ""}" min="0" /></td>`
@@ -271,7 +271,7 @@ async function saveRtBulk() {
     const id = parseInt(tr.dataset.id);
     const body = {
       pickup_port:    tr.querySelector(".rt-inline-pickup").value.trim(),
-      departure_name: tr.querySelector(".rt-inline-dep").value.trim(),
+      departure_code: tr.querySelector(".rt-inline-dep").value.trim(),
       dest_port:      tr.querySelector(".rt-inline-dest").value.trim(),
       memo:           tr.querySelector(".rt-inline-memo").value.trim() || null,
     };
@@ -329,7 +329,7 @@ function startRtEdit(id) {
   if (rtEditMode) cancelRtEditMode();
   document.getElementById("rt-edit-id").value = id;
   document.getElementById("rt-pickup").value = r.pickup_port;
-  document.getElementById("rt-departure").value = r.departure_name;
+  document.getElementById("rt-departure").value = r.departure_code ?? r.departure_name ?? "";
   document.getElementById("rt-dest").value = r.dest_port;
   [1,2,3,4,5,6].forEach(n => { document.getElementById(`rt-tier${n}`).value = r[`tier${n}`] ?? ""; });
   document.getElementById("rt-memo").value = r.memo || "";
@@ -360,7 +360,7 @@ document.getElementById("rt-form").addEventListener("submit", async (e) => {
   const editId = document.getElementById("rt-edit-id").value;
   const body = {
     pickup_port:    document.getElementById("rt-pickup").value,
-    departure_name: document.getElementById("rt-departure").value.trim(),
+    departure_code: document.getElementById("rt-departure").value.trim(),
     dest_port:      document.getElementById("rt-dest").value,
     tier1: nullOrFloat(document.getElementById("rt-tier1").value),
     tier2: nullOrFloat(document.getElementById("rt-tier2").value),
@@ -370,8 +370,8 @@ document.getElementById("rt-form").addEventListener("submit", async (e) => {
     tier6: nullOrFloat(document.getElementById("rt-tier6").value),
     memo:  document.getElementById("rt-memo").value.trim() || null,
   };
-  if (!body.pickup_port || !body.departure_name || !body.dest_port) {
-    showMsg("rt-msg", "픽업항, 출하지명, 도착항은 필수입니다.", false);
+  if (!body.pickup_port || !body.departure_code || !body.dest_port) {
+    showMsg("rt-msg", "픽업항, 출하지코드, 도착항은 필수입니다.", false);
     return;
   }
   const url    = editId ? `/api/trkv/routes/${editId}` : "/api/trkv/routes";
@@ -399,4 +399,16 @@ async function deleteRt(id) {
 document.addEventListener("DOMContentLoaded", () => {
   loadContainerTiers();
   loadRoutes();
+  loadDepCodeList();
 });
+
+async function loadDepCodeList() {
+  try {
+    const res = await fetch("/api/trkv/departure-mappings");
+    if (!res.ok) return;
+    const items = await res.json();
+    const dl = document.getElementById("dep-code-list");
+    if (!dl) return;
+    dl.innerHTML = items.map(d => `<option value="${d.departure_code}">${d.departure_name} → ${d.departure_code}</option>`).join("");
+  } catch { /* 무시 */ }
+}
