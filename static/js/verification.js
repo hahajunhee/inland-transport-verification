@@ -1,12 +1,10 @@
-/* ─── 정산 검증 페이지 스크립트 ─── */
+/* ─── 정산 검증 페이지 스크립트 v3 ─── */
 
 let currentSessionId = null;
 let currentFilter = "ALL";
-let currentPage = 0;
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
-const PAGE_SIZE = 100;
-const EMPTY_COLS = 28;     // colspan for empty message
+const EMPTY_COLS = 29;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -74,7 +72,6 @@ async function uploadFile(file) {
     await loadSessionList();
     renderSummary(session);
     currentSessionId = session.id;
-    currentPage = 0;
     await loadResults();
   } catch (e) {
     document.getElementById("upload-progress").style.display = "none";
@@ -100,7 +97,6 @@ async function loadSession(id) {
   if (!res.ok) return;
   const session = await res.json();
   renderSummary(session);
-  currentPage = 0;
   await loadResults();
 }
 
@@ -130,7 +126,6 @@ function renderSummary(s) {
 // ─── 필터 ────────────────────────────────────────────────
 function setFilter(filter, btn) {
   currentFilter = filter;
-  currentPage = 0;
   document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   loadResults();
@@ -153,7 +148,6 @@ function sortBy(col) {
     sortState.col = col;
     sortState.dir = "asc";
   }
-  currentPage = 0;
   applySortAndRender();
 }
 
@@ -176,7 +170,6 @@ function applySortAndRender() {
 
 function updateSortArrows() {
   document.querySelectorAll(".sortable-th").forEach(th => {
-    // onclick 에서 정렬 키 추출
     const match = (th.getAttribute("onclick") || "").match(/sortBy\('([^']+)'\)/);
     if (!match) return;
     const key = match[1];
@@ -188,35 +181,25 @@ function updateSortArrows() {
   });
 }
 
-// ─── 결과 테이블 렌더 ────────────────────────────────────
+// ─── 결과 테이블 렌더 (전체 행, 페이지 없음) ─────────────
 function renderResults(sorted) {
   const tbody = document.getElementById("results-tbody");
+  const countEl = document.getElementById("result-count");
+
   if (!sorted.length) {
     tbody.innerHTML = `<tr><td colspan="${EMPTY_COLS}" class="empty-msg">결과가 없습니다.</td></tr>`;
-    document.getElementById("pagination").innerHTML = "";
+    if (countEl) countEl.textContent = "";
     return;
   }
 
-  const start    = currentPage * PAGE_SIZE;
-  const pageRows = sorted.slice(start, start + PAGE_SIZE);
-  const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
-
-  tbody.innerHTML = pageRows.map(r => renderRow(r)).join("");
-
-  // 페이지네이션
-  const pag = document.getElementById("pagination");
-  pag.innerHTML = `
-    ${currentPage > 0 ? `<button onclick="changePage(-1)">이전</button>` : ""}
-    <button class="active">${currentPage + 1} / ${totalPages} 페이지 (${sorted.length.toLocaleString()}건)</button>
-    ${currentPage < totalPages - 1 ? `<button onclick="changePage(1)">다음</button>` : ""}
-  `;
+  tbody.innerHTML = sorted.map(r => renderRow(r)).join("");
+  if (countEl) countEl.textContent = `총 ${sorted.length.toLocaleString()}건`;
 }
 
 function renderRow(r) {
   const rowClass = r.overall_status === "DIFF" ? "row-diff"
                  : r.overall_status === "NO_RATE" ? "row-no-rate" : "";
 
-  // 매핑된 포트: 원본명과 다를 때 배지 스타일 적용
   const pickupPort = r.pickup_port_resolved
     ? `<span class="port-resolved">${r.pickup_port_resolved}</span>`
     : "-";
@@ -224,11 +207,13 @@ function renderRow(r) {
     ? `<span class="port-resolved">${r.dest_port_resolved}</span>`
     : "-";
 
+  const qty = r.quantity != null ? Number(r.quantity).toLocaleString("ko-KR") : "1";
+
   return `<tr class="${rowClass}">
     <td>${r.row_number}</td>
     <td>${r.container_no || "-"}</td>
     <td>${r.transport_date || "-"}</td>
-    <!-- 운송 구간 정보 (8열) -->
+    <!-- 운송 구간 정보 (9열) -->
     <td>${r.pickup_name || "-"}</td>
     <td>${pickupPort}</td>
     <td>${r.departure_name || "-"}</td>
@@ -237,6 +222,7 @@ function renderRow(r) {
     <td>${r.dest_name || "-"}</td>
     <td>${destPort}</td>
     <td>${r.container_type || "-"}</td>
+    <td class="money">${qty}</td>
     <!-- TRKV -->
     ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status)}
     <!-- 보관료 -->
@@ -248,12 +234,6 @@ function renderRow(r) {
     <!-- 종합 -->
     <td class="${statusClass(r.overall_status)}">${r.overall_status || "-"}</td>
   </tr>`;
-}
-
-function changePage(delta) {
-  currentPage += delta;
-  applySortAndRender();
-  document.querySelector(".result-table-wrapper").scrollTop = 0;
 }
 
 function chargeCell(actual, expected, diff, status) {

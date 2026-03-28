@@ -185,6 +185,7 @@ def get_trkv_expected(
     dest_name: Optional[str],
     cont_type: Optional[str],
     dg_raw: Optional[str],
+    quantity: float = 1.0,
 ) -> Optional[float]:
     """
     TRKV 예상 금액 반환. 설정 누락 시 None 반환 → NO_RATE 처리.
@@ -231,4 +232,6 @@ def get_trkv_expected(
         return None
 
     price = route.get(f"tier{tier_num}")
-    return price
+    if price is None:
+        return None
+    return price * quantity

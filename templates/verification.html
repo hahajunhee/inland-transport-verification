@@ -111,7 +111,7 @@
             <th rowspan="2" class="sortable-th" onclick="sortBy('row_number')">행# <span class="sort-arrow">↕</span></th>
             <th rowspan="2" class="sortable-th" onclick="sortBy('container_no')">컨테이너번호 <span class="sort-arrow">↕</span></th>
             <th rowspan="2" class="sortable-th" onclick="sortBy('transport_date')">운송일자 <span class="sort-arrow">↕</span></th>
-            <th colspan="8" class="th-group th-route">운송 구간 정보</th>
+            <th colspan="9" class="th-group th-route">운송 구간 정보</th>
             <th colspan="4" class="th-group th-trkv">TRKV</th>
             <th colspan="4" class="th-group th-storage">보관료</th>
             <th colspan="4" class="th-group th-handling">상하차료</th>
@@ -129,6 +129,7 @@
             <th class="th-route sortable-th" onclick="sortBy('dest_name')">도착지명 <span class="sort-arrow">↕</span></th>
             <th class="th-route sortable-th" onclick="sortBy('dest_port_resolved')">도착포트<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
             <th class="th-route sortable-th" onclick="sortBy('container_type')">컨테이너유형 <span class="sort-arrow">↕</span></th>
+            <th class="th-route sortable-th" onclick="sortBy('quantity')">수량 <span class="sort-arrow">↕</span></th>
             <!-- TRKV 4열 -->
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_actual')">청구 <span class="sort-arrow">↕</span></th>
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_expected')">예상 <span class="sort-arrow">↕</span></th>
@@ -146,15 +147,23 @@
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="28" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
+          <tr><td colspan="29" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>
-    <div id="pagination" class="pagination"></div>
+    <div id="result-count" class="result-count"></div>
   </div>
 </div>
+<style>
+.result-count {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #6b7280;
+  text-align: right;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/verification.js?v=2"></script>
+<script src="/static/js/verification.js?v=3"></script>
 {% endblock %}

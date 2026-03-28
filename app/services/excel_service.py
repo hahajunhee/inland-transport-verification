@@ -21,6 +21,7 @@ COLUMN_MAP = {
     "도착지명":               "dest_name",
     "출하일":                 "transport_date",
     "Contrainer No.":         "container_no",
+    "Quantity":               "quantity",
     "Mobis 컨테이너운임(매출)": "trkv_actual",
     "ODCY 보관료":            "storage_actual",
     "ODCY 상하차료":          "handling_actual",
@@ -113,6 +114,10 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
         for field in ("trkv_actual", "storage_actual", "handling_actual", "shuttle_actual"):
             row[field] = _safe_float(row.get(field))
 
+        # 수량 파싱 (없으면 1.0 기본값)
+        qty = _safe_float(row.get("quantity"))
+        row["quantity"] = qty if qty > 0 else 1.0
+
         # 컨테이너 유형 도출
         row["container_type"] = _derive_container_type(row)
 
@@ -159,7 +164,7 @@ def generate_results_excel(results: list) -> bytes:
 
     headers = [
         "행번호", "컨테이너번호", "운송일자", "픽업지코드", "픽업지명",
-        "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물",
+        "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량",
         # TRKV
         "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
         # 보관료
@@ -188,7 +193,7 @@ def generate_results_excel(results: list) -> bytes:
             g("pickup_code"), g("pickup_name"),
             g("odcy_code"), g("odcy_name"),
             g("dest_code"), g("dest_name"),
-            g("container_type"), "Y" if g("dg_flag") else "N",
+            g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"),
             g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
             g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
             g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),

@@ -16,10 +16,10 @@ CHARGES = [
 
 def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
                    pickup_name=None, departure_name=None, dest_name=None,
-                   cont_type=None, dg_raw=None):
+                   cont_type=None, dg_raw=None, quantity=1.0):
     if charge_type == "TRKV":
         expected = trkv_service.get_trkv_expected(
-            pickup_name, departure_name, dest_name, cont_type, dg_raw
+            pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity
         )
     else:
         rate = find_rate(charge_type, pickup_code, odcy_code, dest_code, container_type)
@@ -65,6 +65,7 @@ def run_verification(filename: str, rows: list) -> dict:
         dest_name      = row.get("dest_name")
         cont_type      = row.get("cont_type")
         dg_raw         = row.get("dg_raw")
+        quantity       = float(row.get("quantity") or 1.0)
 
         result = {
             "id": result_id,
@@ -84,6 +85,7 @@ def run_verification(filename: str, rows: list) -> dict:
             "dest_port_resolved": resolve_port(dest_name),
             "container_type": container_type,
             "dg_flag": row.get("dg_flag", False),
+            "quantity": quantity,
         }
         result_id += 1
 
@@ -93,7 +95,7 @@ def run_verification(filename: str, rows: list) -> dict:
             expected, diff, status = _verify_charge(
                 charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
                 pickup_name=pickup_name, departure_name=departure_name, dest_name=dest_name,
-                cont_type=cont_type, dg_raw=dg_raw,
+                cont_type=cont_type, dg_raw=dg_raw, quantity=quantity,
             )
             result[actual_key] = actual
             result[exp_key] = expected
