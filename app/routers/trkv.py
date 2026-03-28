@@ -286,7 +286,7 @@ def _process_upload(wb):
             any(c.value is not None for c in row)
             for row in ws.iter_rows(min_row=2, max_row=ws.max_row or 1)
         )
-        dep_name_col = col_map.get("출하지명 (엑셀 원본명)") or col_map.get("출하지명")
+        dep_name_col = col_map.get("출하지명 (엑셀 원본명)") if "출하지명 (엑셀 원본명)" in col_map else col_map.get("출하지명")
         dep_code_col = col_map.get("출하지코드")
         if has_data and dep_name_col is not None and dep_code_col is not None:
             data_store.save("departure_mappings.json", [])
