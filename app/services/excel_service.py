@@ -164,9 +164,9 @@ def generate_results_excel(results: list) -> bytes:
 
     headers = [
         "행번호", "컨테이너번호", "운송일자", "픽업지코드", "픽업지명",
-        "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량",
+        "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량", "티어번호",
         # TRKV
-        "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
+        "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
         # 보관료
         "보관료청구금액", "보관료예상금액", "보관료차이금액", "보관료상태",
         # 상하차료
@@ -193,8 +193,8 @@ def generate_results_excel(results: list) -> bytes:
             g("pickup_code"), g("pickup_name"),
             g("odcy_code"), g("odcy_name"),
             g("dest_code"), g("dest_name"),
-            g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"),
-            g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
+            g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"), g("tier_number"),
+            g("trkv_unit_rate"), g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
             g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
             g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),
             g("shuttle_actual"), g("shuttle_expected"), g("shuttle_diff"), g("shuttle_status"),

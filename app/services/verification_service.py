@@ -2,7 +2,7 @@ from datetime import datetime
 from app import data_store
 from app.services.rate_service import find_rate
 from app.services import trkv_service
-from app.services.trkv_service import resolve_port, resolve_departure
+from app.services.trkv_service import resolve_port, resolve_departure, get_trkv_details
 
 TOLERANCE = 1.0  # 원 단위 허용 오차
 
@@ -87,6 +87,14 @@ def run_verification(filename: str, rows: list) -> dict:
             "dg_flag": row.get("dg_flag", False),
             "quantity": quantity,
         }
+
+        # 티어번호 + 단가 조회 (운송 구간 정보에 표시용)
+        trkv_details = get_trkv_details(
+            pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity
+        )
+        result["tier_number"]   = trkv_details.get("tier_number")
+        result["trkv_unit_rate"] = trkv_details.get("unit_rate")
+
         result_id += 1
 
         statuses = []

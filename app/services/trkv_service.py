@@ -235,3 +235,55 @@ def get_trkv_expected(
     if price is None:
         return None
     return price * quantity
+
+
+def get_trkv_details(
+    pickup_name: Optional[str],
+    departure_name: Optional[str],
+    dest_name: Optional[str],
+    cont_type: Optional[str],
+    dg_raw: Optional[str],
+    quantity: float = 1.0,
+) -> dict:
+    """
+    티어번호 + 단위요율(단가) + 예상금액을 함께 반환.
+    조회 실패 시 모두 None.
+    """
+    result = {"tier_number": None, "unit_rate": None, "expected": None}
+
+    pickup_port    = resolve_port(pickup_name)
+    dest_port      = resolve_port(dest_name)
+    departure_code = resolve_departure(departure_name)
+    is_dg          = str(dg_raw or "").strip().upper() == "X"
+
+    ct = str(cont_type or "").strip()
+    tiers = data_store.load("container_tiers.json")
+    tier_row = next(
+        (t for t in tiers if t["cont_type"] == ct and t["is_dg"] == is_dg),
+        None,
+    )
+    if not tier_row or tier_row.get("tier_number") is None:
+        return result
+
+    tier_num = tier_row["tier_number"]
+    result["tier_number"] = tier_num
+
+    dep = str(departure_code or "").strip()
+    routes = data_store.load("trkv_routes.json")
+    route = next(
+        (r for r in routes
+         if r.get("pickup_port") == pickup_port
+         and r.get("departure_code", r.get("departure_name", "")) == dep
+         and r.get("dest_port") == dest_port),
+        None,
+    )
+    if not route:
+        return result
+
+    price = route.get(f"tier{tier_num}")
+    if price is None:
+        return result
+
+    result["unit_rate"] = price
+    result["expected"]  = price * quantity
+    return result
