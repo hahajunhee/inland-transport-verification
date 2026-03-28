@@ -22,7 +22,8 @@ COLUMN_MAP = {
     "출하일":                 "transport_date",
     "Contrainer No.":         "container_no",
     "Quantity":               "quantity",
-    "Mobis 컨테이너운임(매출)": "trkv_actual",
+    "Weekend / Holiday":      "weekend_holiday",
+    "Mobis 운임합계(매출)":   "trkv_actual",
     "ODCY 보관료":            "storage_actual",
     "ODCY 상하차료":          "handling_actual",
     "ODCY 셔틀료":            "shuttle_actual",
@@ -135,6 +136,10 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
             val = str(row.get(field) or "").strip()
             row[field] = val if val not in ("nan", "None", "") else None
 
+        # Weekend / Holiday: "X" 여부만 필요하므로 대문자 strip
+        wh = str(row.get("weekend_holiday") or "").strip().upper()
+        row["weekend_holiday"] = "X" if wh == "X" else ""
+
         row["row_number"] = int(idx) + header_row_idx + 2  # 실제 엑셀 행 번호
         rows.append(row)
 
@@ -164,7 +169,7 @@ def generate_results_excel(results: list) -> bytes:
 
     headers = [
         "행번호", "컨테이너번호", "운송일자", "픽업지코드", "픽업지명",
-        "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량", "티어번호",
+        "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호",
         # TRKV
         "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
         # 보관료
@@ -193,7 +198,7 @@ def generate_results_excel(results: list) -> bytes:
             g("pickup_code"), g("pickup_name"),
             g("odcy_code"), g("odcy_name"),
             g("dest_code"), g("dest_name"),
-            g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"), g("tier_number"),
+            g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"), g("weekend_holiday") or "", g("tier_number"),
             g("trkv_unit_rate"), g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
             g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
             g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),

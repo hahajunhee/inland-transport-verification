@@ -111,7 +111,7 @@
             <th rowspan="2" class="sortable-th" onclick="sortBy('row_number')">행# <span class="sort-arrow">↕</span></th>
             <th rowspan="2" class="sortable-th" onclick="sortBy('container_no')">컨테이너번호 <span class="sort-arrow">↕</span></th>
             <th rowspan="2" class="sortable-th" onclick="sortBy('transport_date')">운송일자 <span class="sort-arrow">↕</span></th>
-            <th colspan="10" class="th-group th-route">운송 구간 정보</th>
+            <th colspan="11" class="th-group th-route">운송 구간 정보</th>
             <th colspan="5" class="th-group th-trkv">TRKV</th>
             <th colspan="4" class="th-group th-storage">보관료</th>
             <th colspan="4" class="th-group th-handling">상하차료</th>
@@ -130,6 +130,7 @@
             <th class="th-route sortable-th" onclick="sortBy('dest_port_resolved')">도착포트<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
             <th class="th-route sortable-th" onclick="sortBy('container_type')">컨테이너유형 <span class="sort-arrow">↕</span></th>
             <th class="th-route sortable-th" onclick="sortBy('quantity')">수량 <span class="sort-arrow">↕</span></th>
+            <th class="th-route sortable-th" onclick="sortBy('weekend_holiday')">주말/휴일 <span class="sort-arrow">↕</span></th>
             <th class="th-route sortable-th" onclick="sortBy('tier_number')">티어 <span class="sort-arrow">↕</span></th>
             <!-- TRKV 5열 -->
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_unit_rate')">단가 <span class="sort-arrow">↕</span></th>
@@ -149,7 +150,7 @@
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="31" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
+          <tr><td colspan="32" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>
@@ -175,9 +176,18 @@
 }
 .tier-none { color: #9ca3af; }
 .trkv-unit { color: #374151; font-size: 12px; }
+.wh-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #b45309;
+  font-weight: 700;
+  font-size: 12px;
+}
 </style>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/verification.js?v=4"></script>
+<script src="/static/js/verification.js?v=5"></script>
 {% endblock %}

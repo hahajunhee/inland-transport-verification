@@ -16,10 +16,10 @@ CHARGES = [
 
 def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
                    pickup_name=None, departure_name=None, dest_name=None,
-                   cont_type=None, dg_raw=None, quantity=1.0):
+                   cont_type=None, dg_raw=None, quantity=1.0, weekend_holiday=""):
     if charge_type == "TRKV":
         expected = trkv_service.get_trkv_expected(
-            pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity
+            pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity, weekend_holiday
         )
     else:
         rate = find_rate(charge_type, pickup_code, odcy_code, dest_code, container_type)
@@ -63,9 +63,10 @@ def run_verification(filename: str, rows: list) -> dict:
         pickup_name    = row.get("pickup_name")
         departure_name = row.get("departure_name")
         dest_name      = row.get("dest_name")
-        cont_type      = row.get("cont_type")
-        dg_raw         = row.get("dg_raw")
-        quantity       = float(row.get("quantity") or 1.0)
+        cont_type        = row.get("cont_type")
+        dg_raw           = row.get("dg_raw")
+        quantity         = float(row.get("quantity") or 1.0)
+        weekend_holiday  = str(row.get("weekend_holiday") or "").strip().upper()
 
         result = {
             "id": result_id,
@@ -86,11 +87,12 @@ def run_verification(filename: str, rows: list) -> dict:
             "container_type": container_type,
             "dg_flag": row.get("dg_flag", False),
             "quantity": quantity,
+            "weekend_holiday": weekend_holiday,
         }
 
         # 티어번호 + 단가 조회 (운송 구간 정보에 표시용)
         trkv_details = get_trkv_details(
-            pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity
+            pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity, weekend_holiday
         )
         result["tier_number"]   = trkv_details.get("tier_number")
         result["trkv_unit_rate"] = trkv_details.get("unit_rate")
@@ -104,6 +106,7 @@ def run_verification(filename: str, rows: list) -> dict:
                 charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
                 pickup_name=pickup_name, departure_name=departure_name, dest_name=dest_name,
                 cont_type=cont_type, dg_raw=dg_raw, quantity=quantity,
+                weekend_holiday=weekend_holiday,
             )
             result[actual_key] = actual
             result[exp_key] = expected

@@ -186,6 +186,7 @@ def get_trkv_expected(
     cont_type: Optional[str],
     dg_raw: Optional[str],
     quantity: float = 1.0,
+    weekend_holiday: str = "",
 ) -> Optional[float]:
     """
     TRKV 예상 금액 반환. 설정 누락 시 None 반환 → NO_RATE 처리.
@@ -234,6 +235,10 @@ def get_trkv_expected(
     price = route.get(f"tier{tier_num}")
     if price is None:
         return None
+
+    # Weekend / Holiday "X" → 단가 × 1.2 × 수량, 100원 단위 반올림
+    if str(weekend_holiday or "").strip().upper() == "X":
+        return round(price * 1.2 * quantity, -2)
     return price * quantity
 
 
@@ -244,6 +249,7 @@ def get_trkv_details(
     cont_type: Optional[str],
     dg_raw: Optional[str],
     quantity: float = 1.0,
+    weekend_holiday: str = "",
 ) -> dict:
     """
     티어번호 + 단위요율(단가) + 예상금액을 함께 반환.
@@ -285,5 +291,8 @@ def get_trkv_details(
         return result
 
     result["unit_rate"] = price
-    result["expected"]  = price * quantity
+    if str(weekend_holiday or "").strip().upper() == "X":
+        result["expected"] = round(price * 1.2 * quantity, -2)
+    else:
+        result["expected"] = price * quantity
     return result

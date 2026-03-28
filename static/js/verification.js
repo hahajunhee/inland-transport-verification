@@ -1,10 +1,10 @@
-/* ─── 정산 검증 페이지 스크립트 v3 ─── */
+/* ─── 정산 검증 페이지 스크립트 v5 ─── */
 
 let currentSessionId = null;
 let currentFilter = "ALL";
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
-const EMPTY_COLS = 31;     // colspan for empty message
+const EMPTY_COLS = 32;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -207,17 +207,20 @@ function renderRow(r) {
     ? `<span class="port-resolved">${r.dest_port_resolved}</span>`
     : "-";
 
-  const qty      = r.quantity   != null ? Number(r.quantity).toLocaleString("ko-KR") : "1";
+  const qty       = r.quantity   != null ? Number(r.quantity).toLocaleString("ko-KR") : "1";
   const tierBadge = r.tier_number != null
     ? `<span class="tier-badge">T${r.tier_number}</span>`
     : `<span class="tier-none">-</span>`;
   const unitRate  = r.trkv_unit_rate != null ? fmtMoney(r.trkv_unit_rate) : "-";
+  const whCell    = r.weekend_holiday === "X"
+    ? `<span class="wh-badge">X</span>`
+    : `<span style="color:#9ca3af">-</span>`;
 
   return `<tr class="${rowClass}">
     <td>${r.row_number}</td>
     <td>${r.container_no || "-"}</td>
     <td>${r.transport_date || "-"}</td>
-    <!-- 운송 구간 정보 (10열) -->
+    <!-- 운송 구간 정보 (11열) -->
     <td>${r.pickup_name || "-"}</td>
     <td>${pickupPort}</td>
     <td>${r.departure_name || "-"}</td>
@@ -227,6 +230,7 @@ function renderRow(r) {
     <td>${destPort}</td>
     <td>${r.container_type || "-"}</td>
     <td class="money">${qty}</td>
+    <td class="td-center">${whCell}</td>
     <td class="td-tier">${tierBadge}</td>
     <!-- TRKV (5열: 단가 + 청구 + 예상 + 차이 + 상태) -->
     <td class="money trkv-unit">${unitRate}</td>
