@@ -67,6 +67,7 @@ def run_verification(filename: str, rows: list) -> dict:
         dg_raw           = row.get("dg_raw")
         quantity         = float(row.get("quantity") or 1.0)
         weekend_holiday  = str(row.get("weekend_holiday") or "").strip().upper()
+        trkv_surcharge   = float(row.get("trkv_surcharge") or 0.0)
 
         result = {
             "id": result_id,
@@ -88,6 +89,7 @@ def run_verification(filename: str, rows: list) -> dict:
             "dg_flag": row.get("dg_flag", False),
             "quantity": quantity,
             "weekend_holiday": weekend_holiday,
+            "trkv_surcharge": trkv_surcharge,
         }
 
         # 티어번호 + 단가 조회 (운송 구간 정보에 표시용)
@@ -108,6 +110,11 @@ def run_verification(filename: str, rows: list) -> dict:
                 cont_type=cont_type, dg_raw=dg_raw, quantity=quantity,
                 weekend_holiday=weekend_holiday,
             )
+            # TRKV: 할증운임을 예상에 합산하여 차이 재계산
+            if charge_type == "TRKV" and expected is not None:
+                diff = actual - (expected + trkv_surcharge)
+                status = "OK" if abs(diff) < TOLERANCE else "DIFF"
+
             result[actual_key] = actual
             result[exp_key] = expected
             result[diff_key] = diff

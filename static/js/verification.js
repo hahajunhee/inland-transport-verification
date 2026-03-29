@@ -1,10 +1,10 @@
-/* ─── 정산 검증 페이지 스크립트 v5 ─── */
+/* ─── 정산 검증 페이지 스크립트 v6 ─── */
 
 let currentSessionId = null;
 let currentFilter = "ALL";
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
-const EMPTY_COLS = 32;     // colspan for empty message
+const EMPTY_COLS = 33;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -232,9 +232,9 @@ function renderRow(r) {
     <td class="money">${qty}</td>
     <td class="td-center">${whCell}</td>
     <td class="td-tier">${tierBadge}</td>
-    <!-- TRKV (5열: 단가 + 청구 + 예상 + 차이 + 상태) -->
+    <!-- TRKV (6열: 단가 + 청구 + 예상 + 할증 + 차이 + 상태) -->
     <td class="money trkv-unit">${unitRate}</td>
-    ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status)}
+    ${trkvChargeCell(r.trkv_actual, r.trkv_expected, r.trkv_surcharge, r.trkv_diff, r.trkv_status)}
     <!-- 보관료 -->
     ${chargeCell(r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status)}
     <!-- 상하차료 -->
@@ -244,6 +244,22 @@ function renderRow(r) {
     <!-- 종합 -->
     <td class="${statusClass(r.overall_status)}">${r.overall_status || "-"}</td>
   </tr>`;
+}
+
+function trkvChargeCell(actual, expected, surcharge, diff, status) {
+  const sc = statusClass(status);
+  const diffStr = diff != null ? (diff >= 0 ? "+" : "") + fmtMoney(diff) : "-";
+  const diffColor = diff > 0.5 ? 'style="color:#c62828"' : diff < -0.5 ? 'style="color:#1a73e8"' : "";
+  const surchargeStr = (surcharge != null && surcharge !== 0)
+    ? `<span style="color:#7c3aed;font-weight:600">${fmtMoney(surcharge)}</span>`
+    : `<span style="color:#9ca3af">-</span>`;
+  return `
+    <td class="money">${fmtMoney(actual)}</td>
+    <td class="money">${expected != null ? fmtMoney(expected) : "-"}</td>
+    <td class="money">${surchargeStr}</td>
+    <td class="money" ${diffColor}>${diffStr}</td>
+    <td class="${sc}">${status || "-"}</td>
+  `;
 }
 
 function chargeCell(actual, expected, diff, status) {
