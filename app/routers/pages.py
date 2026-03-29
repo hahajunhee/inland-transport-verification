@@ -49,3 +49,8 @@ def trkv_page(request: Request):
 @router.get("/mapping")
 def mapping_page(request: Request):
     return templates.TemplateResponse("mapping.html", {"request": request})
+
+
+@router.get("/storage-rates")
+def storage_rates_page(request: Request):
+    return templates.TemplateResponse("storage_rates.html", {"request": request})

@@ -16,6 +16,7 @@ COLUMN_MAP = {
     "픽업지명":               "pickup_name",
     "상세 ODCY":              "odcy_code",
     "상세 ODCY명":            "odcy_name",
+    "ODCY도착지명":           "odcy_destination_name",
     "출하지명":               "departure_name",
     "도착지":                 "dest_code",
     "도착지명":               "dest_name",
@@ -132,7 +133,7 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
         row["transport_date"] = td if td not in ("nan", "None", "") else None
 
         # 코드/이름 strip
-        for field in ("pickup_code", "pickup_name", "odcy_code", "odcy_name", "dest_code", "dest_name", "container_no", "departure_name"):
+        for field in ("pickup_code", "pickup_name", "odcy_code", "odcy_name", "odcy_destination_name", "dest_code", "dest_name", "container_no", "departure_name"):
             val = str(row.get(field) or "").strip()
             row[field] = val if val not in ("nan", "None", "") else None
 

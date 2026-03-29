@@ -17,6 +17,12 @@ router = APIRouter()
 class PortMappingCreate(BaseModel):
     excel_name: str
     port_type: str
+    zone_type: Optional[str] = ""
+
+
+class OdcyMappingCreate(BaseModel):
+    odcy_destination_name: str
+    odcy_name: str
 
 
 class DepartureMappingCreate(BaseModel):
@@ -57,14 +63,14 @@ def list_port_mappings():
 @router.post("/port-mappings", status_code=201)
 def add_port_mapping(body: PortMappingCreate):
     try:
-        return trkv_service.create_port_mapping(body.excel_name, body.port_type)
+        return trkv_service.create_port_mapping(body.excel_name, body.port_type, body.zone_type or "")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/port-mappings/{mapping_id}")
 def edit_port_mapping(mapping_id: int, body: PortMappingCreate):
-    obj = trkv_service.update_port_mapping(mapping_id, body.excel_name, body.port_type)
+    obj = trkv_service.update_port_mapping(mapping_id, body.excel_name, body.port_type, body.zone_type or "")
     if not obj:
         raise HTTPException(status_code=404, detail="포트 매핑을 찾을 수 없습니다.")
     return obj
@@ -103,6 +109,35 @@ def edit_departure_mapping(mapping_id: int, body: DepartureMappingCreate):
 def remove_departure_mapping(mapping_id: int):
     if not trkv_service.delete_departure_mapping(mapping_id):
         raise HTTPException(status_code=404, detail="출하지 매핑을 찾을 수 없습니다.")
+
+
+# ─── ODCY 매핑 CRUD ──────────────────────────────────────────────────
+
+@router.get("/odcy-mappings")
+def list_odcy_mappings():
+    return trkv_service.get_all_odcy_mappings()
+
+
+@router.post("/odcy-mappings", status_code=201)
+def add_odcy_mapping(body: OdcyMappingCreate):
+    try:
+        return trkv_service.create_odcy_mapping(body.odcy_destination_name, body.odcy_name)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/odcy-mappings/{mapping_id}")
+def edit_odcy_mapping(mapping_id: int, body: OdcyMappingCreate):
+    obj = trkv_service.update_odcy_mapping(mapping_id, body.odcy_destination_name, body.odcy_name)
+    if not obj:
+        raise HTTPException(status_code=404, detail="ODCY 매핑을 찾을 수 없습니다.")
+    return obj
+
+
+@router.delete("/odcy-mappings/{mapping_id}", status_code=204)
+def remove_odcy_mapping(mapping_id: int):
+    if not trkv_service.delete_odcy_mapping(mapping_id):
+        raise HTTPException(status_code=404, detail="ODCY 매핑을 찾을 수 없습니다.")
 
 
 # ─── 구간요율 CRUD ─────────────────────────────────────────────────────
@@ -169,19 +204,20 @@ def download_unified_template():
     """현재 등록된 데이터를 포함한 통합 양식 다운로드 (전체 교체용)"""
     port_mappings      = trkv_service.get_all_port_mappings()
     departure_mappings = trkv_service.get_all_departure_mappings()
+    odcy_mappings      = trkv_service.get_all_odcy_mappings()
     routes             = trkv_service.get_all_routes()
 
     wb = openpyxl.Workbook()
 
-    # ── Sheet 1: 포트명 매핑 ──────────────────────────────────────────
+    # ── Sheet 1: 포트명 매핑 (포트구분 + 단지구분) ──────────────────────
     ws_pm = wb.active
     ws_pm.title = "포트명 매핑"
-    _style_header(ws_pm, ["엑셀 원본명", "포트 구분"], [30, 15])
+    _style_header(ws_pm, ["엑셀 원본명", "포트 구분", "단지구분"], [30, 15, 20])
     for pm in port_mappings:
-        ws_pm.append([pm["excel_name"], pm["port_type"]])
+        ws_pm.append([pm["excel_name"], pm["port_type"], pm.get("zone_type", "")])
     if not port_mappings:
-        ws_pm.append(["부산신항BPTS", "부산신항"])
-        ws_pm.append(["부산북항BPNC", "부산북항"])
+        ws_pm.append(["부산신항BPTS", "부산신항", ""])
+        ws_pm.append(["북컨배후단지", "부산북항", "배후단지"])
 
     # ── Sheet 2: 출하지 매핑 ──────────────────────────────────────────
     ws_dm = wb.create_sheet("출하지 매핑")
@@ -192,7 +228,15 @@ def download_unified_template():
         ws_dm.append(["아산공장", "AS"])
         ws_dm.append(["울산출하지", "UL"])
 
-    # ── Sheet 3: TRKV 구간 요율 ──────────────────────────────────────
+    # ── Sheet 3: ODCY 매핑 ────────────────────────────────────────────
+    ws_om = wb.create_sheet("ODCY 매핑")
+    _style_header(ws_om, ["ODCY 도착지명 (엑셀 원본명)", "ODCY명"], [35, 20])
+    for om in odcy_mappings:
+        ws_om.append([om["odcy_destination_name"], om["odcy_name"]])
+    if not odcy_mappings:
+        ws_om.append(["SB청암", "세방(주)"])
+
+    # ── Sheet 4: TRKV 구간 요율 ─────────────────────────────────────
     ws_rt = wb.create_sheet("TRKV 구간 요율")
     _style_header(
         ws_rt,
@@ -264,15 +308,22 @@ def _process_upload(wb):
         if has_data and "엑셀 원본명" in col_map and "포트 구분" in col_map:
             data_store.save("port_mappings.json", [])
             success, failed, new_items, next_id = 0, [], [], 1
+            zone_col = col_map.get("단지구분")
             for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
                 excel_name = row[col_map["엑셀 원본명"]].value
                 port_type  = row[col_map["포트 구분"]].value
+                zone_type  = row[zone_col].value if zone_col is not None else None
                 if not excel_name and not port_type:
                     continue
                 if not excel_name or not port_type:
                     failed.append({"row": i, "error": "엑셀 원본명, 포트 구분 모두 필수입니다."})
                     continue
-                new_items.append({"id": next_id, "excel_name": str(excel_name).strip(), "port_type": str(port_type).strip()})
+                new_items.append({
+                    "id": next_id,
+                    "excel_name": str(excel_name).strip(),
+                    "port_type": str(port_type).strip(),
+                    "zone_type": str(zone_type).strip() if zone_type else "",
+                })
                 next_id += 1; success += 1
             data_store.save("port_mappings.json", new_items)
             result["포트명 매핑"] = {"success": success, "failed": failed}
@@ -303,6 +354,37 @@ def _process_upload(wb):
                 next_id += 1; success += 1
             data_store.save("departure_mappings.json", new_items)
             result["출하지 매핑"] = {"success": success, "failed": failed}
+
+    # ── ODCY 매핑 시트 ───────────────────────────────────────────────
+    if "ODCY 매핑" in wb.sheetnames:
+        ws = wb["ODCY 매핑"]
+        header  = [cell.value for cell in ws[1]]
+        col_map = {str(v).strip(): i for i, v in enumerate(header) if v is not None}
+        has_data = any(
+            any(c.value is not None for c in row)
+            for row in ws.iter_rows(min_row=2, max_row=ws.max_row or 1)
+        )
+        dest_col = col_map.get("ODCY 도착지명 (엑셀 원본명)") if "ODCY 도착지명 (엑셀 원본명)" in col_map else col_map.get("ODCY 도착지명")
+        name_col = col_map.get("ODCY명")
+        if has_data and dest_col is not None and name_col is not None:
+            data_store.save("odcy_mappings.json", [])
+            success, failed, new_items, next_id = 0, [], [], 1
+            for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
+                odcy_dest = row[dest_col].value
+                odcy_name = row[name_col].value
+                if not odcy_dest and not odcy_name:
+                    continue
+                if not odcy_dest or not odcy_name:
+                    failed.append({"row": i, "error": "ODCY 도착지명, ODCY명 모두 필수입니다."})
+                    continue
+                new_items.append({
+                    "id": next_id,
+                    "odcy_destination_name": str(odcy_dest).strip(),
+                    "odcy_name": str(odcy_name).strip(),
+                })
+                next_id += 1; success += 1
+            data_store.save("odcy_mappings.json", new_items)
+            result["ODCY 매핑"] = {"success": success, "failed": failed}
 
     # ── TRKV 구간 요율 시트 ──────────────────────────────────────────
     if "TRKV 구간 요율" in wb.sheetnames:

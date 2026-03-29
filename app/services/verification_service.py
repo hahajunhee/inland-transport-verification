@@ -2,7 +2,8 @@ from datetime import datetime
 from app import data_store
 from app.services.rate_service import find_rate
 from app.services import trkv_service
-from app.services.trkv_service import resolve_port, resolve_departure, get_trkv_details
+from app.services.trkv_service import resolve_port, resolve_departure, resolve_odcy_name, resolve_zone_type, get_trkv_details
+from app.services.storage_rate_service import find_storage_rate
 
 TOLERANCE = 1.0  # 원 단위 허용 오차
 
@@ -16,11 +17,18 @@ CHARGES = [
 
 def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
                    pickup_name=None, departure_name=None, dest_name=None,
-                   cont_type=None, dg_raw=None, quantity=1.0, weekend_holiday=""):
+                   cont_type=None, dg_raw=None, quantity=1.0, weekend_holiday="",
+                   odcy_name_resolved=None, zone_type=None):
     if charge_type == "TRKV":
         expected = trkv_service.get_trkv_expected(
             pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity, weekend_holiday
         )
+    elif charge_type in ("보관료", "상하차료"):
+        rate = find_storage_rate(odcy_name_resolved, zone_type)
+        if rate:
+            expected = rate.get("storage_unit") if charge_type == "보관료" else rate.get("handling_unit")
+        else:
+            expected = None
     else:
         rate = find_rate(charge_type, pickup_code, odcy_code, dest_code, container_type)
         expected = rate.get("unit_price") if rate else None
@@ -63,10 +71,13 @@ def run_verification(filename: str, rows: list) -> dict:
         pickup_name    = row.get("pickup_name")
         departure_name = row.get("departure_name")
         dest_name      = row.get("dest_name")
-        cont_type        = row.get("cont_type")
-        dg_raw           = row.get("dg_raw")
-        quantity         = float(row.get("quantity") or 1.0)
-        weekend_holiday  = str(row.get("weekend_holiday") or "").strip().upper()
+        cont_type              = row.get("cont_type")
+        dg_raw                 = row.get("dg_raw")
+        quantity               = float(row.get("quantity") or 1.0)
+        weekend_holiday        = str(row.get("weekend_holiday") or "").strip().upper()
+        odcy_destination_name  = row.get("odcy_destination_name")
+        odcy_name_resolved     = resolve_odcy_name(odcy_destination_name or row.get("odcy_name"))
+        zone_type              = resolve_zone_type(dest_name)
 
         result = {
             "id": result_id,
@@ -88,6 +99,9 @@ def run_verification(filename: str, rows: list) -> dict:
             "dg_flag": row.get("dg_flag", False),
             "quantity": quantity,
             "weekend_holiday": weekend_holiday,
+            "odcy_destination_name": odcy_destination_name,
+            "odcy_name_resolved": odcy_name_resolved,
+            "zone_type": zone_type,
         }
 
         # 티어번호 + 단가 조회 (운송 구간 정보에 표시용)
@@ -107,6 +121,7 @@ def run_verification(filename: str, rows: list) -> dict:
                 pickup_name=pickup_name, departure_name=departure_name, dest_name=dest_name,
                 cont_type=cont_type, dg_raw=dg_raw, quantity=quantity,
                 weekend_holiday=weekend_holiday,
+                odcy_name_resolved=odcy_name_resolved, zone_type=zone_type,
             )
             result[actual_key] = actual
             result[exp_key] = expected

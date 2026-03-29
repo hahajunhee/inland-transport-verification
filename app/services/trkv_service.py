@@ -16,11 +16,23 @@ def resolve_port(name: Optional[str]) -> Optional[str]:
     return name
 
 
+def resolve_zone_type(name: Optional[str]) -> Optional[str]:
+    """엑셀 도착지명 → 단지구분. 포트명 매핑의 zone_type 필드 사용."""
+    if not name:
+        return name
+    name = name.strip()
+    items = data_store.load("port_mappings.json")
+    for m in items:
+        if m["excel_name"] == name:
+            return m.get("zone_type") or ""
+    return ""
+
+
 def get_all_port_mappings() -> list:
     return sorted(data_store.load("port_mappings.json"), key=lambda x: x["id"])
 
 
-def create_port_mapping(excel_name: str, port_type: str) -> dict:
+def create_port_mapping(excel_name: str, port_type: str, zone_type: str = "") -> dict:
     items = data_store.load("port_mappings.json")
     if any(m["excel_name"] == excel_name.strip() for m in items):
         raise ValueError("이미 등록된 포트명입니다.")
@@ -28,18 +40,20 @@ def create_port_mapping(excel_name: str, port_type: str) -> dict:
         "id": data_store.next_id(items),
         "excel_name": excel_name.strip(),
         "port_type": port_type,
+        "zone_type": zone_type.strip() if zone_type else "",
     }
     items.append(obj)
     data_store.save("port_mappings.json", items)
     return obj
 
 
-def update_port_mapping(mapping_id: int, excel_name: str, port_type: str) -> Optional[dict]:
+def update_port_mapping(mapping_id: int, excel_name: str, port_type: str, zone_type: str = "") -> Optional[dict]:
     items = data_store.load("port_mappings.json")
     for i, m in enumerate(items):
         if m["id"] == mapping_id:
             items[i]["excel_name"] = excel_name.strip()
             items[i]["port_type"] = port_type
+            items[i]["zone_type"] = zone_type.strip() if zone_type else ""
             data_store.save("port_mappings.json", items)
             return items[i]
     return None
@@ -103,6 +117,58 @@ def delete_departure_mapping(mapping_id: int) -> bool:
     if len(new_items) == len(items):
         return False
     data_store.save("departure_mappings.json", new_items)
+    return True
+
+
+# ─── ODCY 매핑 ───────────────────────────────────────────────────────
+
+def resolve_odcy_name(name: Optional[str]) -> Optional[str]:
+    """엑셀 ODCY도착지명 → ODCY명. 매핑 없으면 원본 그대로 반환."""
+    if not name:
+        return name
+    name = name.strip()
+    items = data_store.load("odcy_mappings.json")
+    for m in items:
+        if m["odcy_destination_name"] == name:
+            return m["odcy_name"]
+    return name
+
+
+def get_all_odcy_mappings() -> list:
+    return sorted(data_store.load("odcy_mappings.json"), key=lambda x: x["id"])
+
+
+def create_odcy_mapping(odcy_destination_name: str, odcy_name: str) -> dict:
+    items = data_store.load("odcy_mappings.json")
+    if any(m["odcy_destination_name"] == odcy_destination_name.strip() for m in items):
+        raise ValueError("이미 등록된 ODCY 도착지명입니다.")
+    obj = {
+        "id": data_store.next_id(items),
+        "odcy_destination_name": odcy_destination_name.strip(),
+        "odcy_name": odcy_name.strip(),
+    }
+    items.append(obj)
+    data_store.save("odcy_mappings.json", items)
+    return obj
+
+
+def update_odcy_mapping(mapping_id: int, odcy_destination_name: str, odcy_name: str) -> Optional[dict]:
+    items = data_store.load("odcy_mappings.json")
+    for i, m in enumerate(items):
+        if m["id"] == mapping_id:
+            items[i]["odcy_destination_name"] = odcy_destination_name.strip()
+            items[i]["odcy_name"] = odcy_name.strip()
+            data_store.save("odcy_mappings.json", items)
+            return items[i]
+    return None
+
+
+def delete_odcy_mapping(mapping_id: int) -> bool:
+    items = data_store.load("odcy_mappings.json")
+    new_items = [m for m in items if m["id"] != mapping_id]
+    if len(new_items) == len(items):
+        return False
+    data_store.save("odcy_mappings.json", new_items)
     return True
 
 

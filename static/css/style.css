@@ -170,6 +170,7 @@ a:hover { text-decoration: underline; }
 .badge-no-rate { background: #fff9e6; color: #856404; }
 .badge-skip { background: #f2f2f2; color: #888; }
 .badge-blue { background: #e8f0fe; color: #1a73e8; }
+.badge-green { background: #e6f4ea; color: #1e7e34; }
 .badge-purple { background: #f3e8fd; color: #6a1b9a; }
 .badge-red { background: #fce8e6; color: #c62828; }
 .badge-gray { background: #f2f2f2; color: #666; }
