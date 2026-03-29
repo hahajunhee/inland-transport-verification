@@ -112,7 +112,7 @@
             <th rowspan="2" class="sortable-th" onclick="sortBy('container_no')">컨테이너번호 <span class="sort-arrow">↕</span></th>
             <th rowspan="2" class="sortable-th" onclick="sortBy('transport_date')">운송일자 <span class="sort-arrow">↕</span></th>
             <th colspan="11" class="th-group th-route">운송 구간 정보</th>
-            <th colspan="6" class="th-group th-trkv">TRKV</th>
+            <th colspan="5" class="th-group th-trkv">TRKV</th>
             <th colspan="4" class="th-group th-storage">보관료</th>
             <th colspan="4" class="th-group th-handling">상하차료</th>
             <th colspan="4" class="th-group th-shuttle">셔틀비용</th>
@@ -136,8 +136,7 @@
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_unit_rate')">단가 <span class="sort-arrow">↕</span></th>
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_actual')">청구 <span class="sort-arrow">↕</span></th>
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_expected')">예상 <span class="sort-arrow">↕</span></th>
-            <th class="th-trkv sortable-th" onclick="sortBy('trkv_surcharge')">할증 <span class="sort-arrow">↕</span></th>
-            <th class="th-trkv sortable-th" onclick="sortBy('trkv_diff')">차이<br><small>(청구-예상-할증)</small> <span class="sort-arrow">↕</span></th>
+            <th class="th-trkv sortable-th" onclick="sortBy('trkv_diff')">차이 <span class="sort-arrow">↕</span></th>
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_status')">상태 <span class="sort-arrow">↕</span></th>
             <!-- 보관료 4열 -->
             <th class="th-storage">청구</th><th class="th-storage">예상</th><th class="th-storage">차이</th>
@@ -151,7 +150,7 @@
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="33" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
+          <tr><td colspan="32" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>
@@ -190,5 +189,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/verification.js?v=6"></script>
+<script src="/static/js/verification.js?v=5"></script>
 {% endblock %}
