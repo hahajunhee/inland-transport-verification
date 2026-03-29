@@ -6,7 +6,7 @@ from typing import Optional
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
-from app.services import trkv_service
+from app.services import trkv_service, storage_rate_service
 from app import data_store
 
 router = APIRouter()
@@ -201,15 +201,16 @@ def _style_header(ws, headers: list, col_widths: list):
 
 @router.get("/template")
 def download_unified_template():
-    """현재 등록된 데이터를 포함한 통합 양식 다운로드 (전체 교체용)"""
+    """현재 등록된 데이터를 포함한 통합 양식 다운로드 (전체 교체용, 5-시트)"""
     port_mappings      = trkv_service.get_all_port_mappings()
     departure_mappings = trkv_service.get_all_departure_mappings()
     odcy_mappings      = trkv_service.get_all_odcy_mappings()
     routes             = trkv_service.get_all_routes()
+    storage_rates      = storage_rate_service.get_all_storage_rates()
 
     wb = openpyxl.Workbook()
 
-    # ── Sheet 1: 포트명 매핑 (포트구분 + 단지구분) ──────────────────────
+    # ── Sheet 1: 포트명 매핑 ─────────────────────────────────────────
     ws_pm = wb.active
     ws_pm.title = "포트명 매핑"
     _style_header(ws_pm, ["엑셀 원본명", "포트 구분", "단지구분"], [30, 15, 20])
@@ -219,7 +220,7 @@ def download_unified_template():
         ws_pm.append(["부산신항BPTS", "부산신항", ""])
         ws_pm.append(["북컨배후단지", "부산북항", "배후단지"])
 
-    # ── Sheet 2: 출하지 매핑 ──────────────────────────────────────────
+    # ── Sheet 2: 출하지 매핑 ─────────────────────────────────────────
     ws_dm = wb.create_sheet("출하지 매핑")
     _style_header(ws_dm, ["출하지명 (엑셀 원본명)", "출하지코드"], [30, 15])
     for dm in departure_mappings:
@@ -228,7 +229,7 @@ def download_unified_template():
         ws_dm.append(["아산공장", "AS"])
         ws_dm.append(["울산출하지", "UL"])
 
-    # ── Sheet 3: ODCY 매핑 ────────────────────────────────────────────
+    # ── Sheet 3: ODCY 매핑 ───────────────────────────────────────────
     ws_om = wb.create_sheet("ODCY 매핑")
     _style_header(ws_om, ["ODCY 도착지명 (엑셀 원본명)", "ODCY명"], [35, 20])
     for om in odcy_mappings:
@@ -236,7 +237,7 @@ def download_unified_template():
     if not odcy_mappings:
         ws_om.append(["SB청암", "세방(주)"])
 
-    # ── Sheet 4: TRKV 구간 요율 ─────────────────────────────────────
+    # ── Sheet 4: TRKV 구간 요율 ──────────────────────────────────────
     ws_rt = wb.create_sheet("TRKV 구간 요율")
     _style_header(
         ws_rt,
@@ -246,7 +247,7 @@ def download_unified_template():
     for r in routes:
         ws_rt.append([
             r.get("pickup_port"),
-            r.get("departure_code", r.get("departure_name")),  # 구버전 호환
+            r.get("departure_code", r.get("departure_name")),
             r.get("dest_port"),
             r.get("tier1"), r.get("tier2"), r.get("tier3"),
             r.get("tier4"), r.get("tier5"), r.get("tier6"),
@@ -255,13 +256,24 @@ def download_unified_template():
     if not routes:
         ws_rt.append(["부산신항", "AS", "부산북항", 100000, 110000, 120000, 130000, 140000, 150000, "예시 (등록 후 삭제)"])
 
+    # ── Sheet 5: 보관료_상하차료 요율 ────────────────────────────────
+    ws_sr = wb.create_sheet("보관료_상하차료 요율")
+    _style_header(ws_sr, ["ODCY명", "단지구분", "보관료 단가", "상하차료 단가", "비고"], [20, 20, 14, 14, 30])
+    for sr in storage_rates:
+        ws_sr.append([
+            sr.get("odcy_name", ""), sr.get("zone_type", ""),
+            sr.get("storage_unit"), sr.get("handling_unit"), sr.get("memo", ""),
+        ])
+    if not storage_rates:
+        ws_sr.append(["세방(주)", "배후단지", 10000, 8000, "예시 (등록 후 삭제)"])
+
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename*=UTF-8''trkv_template.xlsx"},
+        headers={"Content-Disposition": "attachment; filename*=UTF-8''unified_template.xlsx"},
     )
 
 
@@ -431,6 +443,46 @@ def _process_upload(wb):
                 next_id += 1; success += 1
             data_store.save("trkv_routes.json", new_routes)
             result["TRKV 구간 요율"] = {"success": success, "failed": failed}
+
+    # ── 보관료_상하차료 요율 시트 ─────────────────────────────────────
+    for sheet_name in wb.sheetnames:
+        if "보관료" in sheet_name or "상하차" in sheet_name:
+            ws = wb[sheet_name]
+            header  = [cell.value for cell in ws[1]]
+            col_map = {str(v).strip(): i for i, v in enumerate(header) if v is not None}
+            has_data = any(
+                any(c.value is not None for c in row)
+                for row in ws.iter_rows(min_row=2, max_row=ws.max_row or 1)
+            )
+            if has_data and ("보관료 단가" in col_map or "상하차료 단가" in col_map):
+                data_store.save("storage_rates.json", [])
+                odcy_col     = col_map.get("ODCY명")
+                zone_col     = col_map.get("단지구분")
+                storage_col  = col_map.get("보관료 단가")
+                handling_col = col_map.get("상하차료 단가")
+                memo_col     = col_map.get("비고")
+                success, failed, new_items, next_id = 0, [], [], 1
+                for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
+                    def _gv(col_idx, _row=row):
+                        return _row[col_idx].value if col_idx is not None else None
+                    odcy_name    = str(_gv(odcy_col) or "").strip()
+                    zone_type    = str(_gv(zone_col) or "").strip()
+                    storage_unit = to_float(_gv(storage_col))
+                    handling_unit= to_float(_gv(handling_col))
+                    if not odcy_name and not zone_type and storage_unit is None and handling_unit is None:
+                        continue
+                    new_items.append({
+                        "id": next_id,
+                        "odcy_name": odcy_name,
+                        "zone_type": zone_type,
+                        "storage_unit": storage_unit,
+                        "handling_unit": handling_unit,
+                        "memo": str(_gv(memo_col) or "").strip(),
+                    })
+                    next_id += 1; success += 1
+                data_store.save("storage_rates.json", new_items)
+                result["보관료_상하차료 요율"] = {"success": success, "failed": failed}
+            break  # 시트 하나만 처리
 
     if not result:
         raise HTTPException(400, detail="처리할 수 있는 시트가 없습니다. 통합 양식을 사용하세요.")

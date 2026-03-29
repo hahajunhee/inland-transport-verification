@@ -1,4 +1,4 @@
-/* ─── 보관료/상하차료 요율 페이지 스크립트 v1 ─── */
+/* ─── 보관료/상하차료 요율 페이지 스크립트 v2 ─── */
 
 function showMsg(elId, msg, isOk) {
   const el = document.getElementById(elId);
@@ -134,7 +134,8 @@ async function deleteSr(id) {
 }
 
 function downloadTemplate() {
-  window.location.href = "/api/storage-rates/template";
+  // 전체 통합 양식 (5개 시트) 다운로드
+  window.location.href = "/api/trkv/template";
 }
 
 async function uploadRates() {
@@ -151,18 +152,28 @@ async function uploadRates() {
   msgEl.style.display = "inline";
 
   try {
-    const res  = await fetch("/api/storage-rates/upload", { method: "POST", body: fd });
+    // 통합 업로드 엔드포인트 사용 (모든 시트 전체 교체)
+    const res  = await fetch("/api/trkv/upload", { method: "POST", body: fd });
     const data = await res.json();
     if (res.ok) {
-      msgEl.textContent = `✅ ${data.success}건 교체 완료`;
-      msgEl.className   = "upload-result ok";
+      const sheets = data.sheets || {};
+      const srSheet = sheets["보관료_상하차료 요율"];
+      if (srSheet) {
+        const fails = srSheet.failed?.length || 0;
+        msgEl.textContent = `완료 — 보관료/상하차료 ${srSheet.success}건 교체` + (fails ? ` (오류 ${fails}건)` : "");
+      } else {
+        // 다른 시트만 처리됐어도 성공으로 표시
+        const totalSuccess = Object.values(sheets).reduce((acc, s) => acc + (s.success || 0), 0);
+        msgEl.textContent = `완료 — 전체 ${totalSuccess}건 교체 (보관료 시트 없음)`;
+      }
+      msgEl.className = "upload-result ok";
       loadStorageRates();
     } else {
-      msgEl.textContent = `❌ ${data.detail || "업로드 실패"}`;
+      msgEl.textContent = `오류: ${data.detail || "업로드 실패"}`;
       msgEl.className   = "upload-result err";
     }
   } catch {
-    msgEl.textContent = "❌ 네트워크 오류";
+    msgEl.textContent = "네트워크 오류";
     msgEl.className   = "upload-result err";
   }
   fileInput.value = "";
