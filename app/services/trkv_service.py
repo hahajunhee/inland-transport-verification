@@ -16,15 +16,39 @@ def resolve_port(name: Optional[str]) -> Optional[str]:
     return name
 
 
+def resolve_port_terminal_type(name: Optional[str]) -> str:
+    """엑셀 포트명 → 포트 매핑의 터미널구분. 매핑 없으면 빈 문자열 반환."""
+    if not name:
+        return ""
+    name = name.strip()
+    items = data_store.load("port_mappings.json")
+    for m in items:
+        if m["excel_name"] == name:
+            return m.get("terminal_type") or ""
+    return ""
+
+
 def resolve_terminal_type(odcy_destination_name: Optional[str]) -> str:
-    """ODCY 도착지명 → 터미널구분. ODCY 매핑의 terminal_type 필드 사용."""
+    """ODCY 도착지명 → odcy터미널구분. ODCY 매핑의 odcy_terminal_type 필드 사용."""
     if not odcy_destination_name:
         return ""
     name = odcy_destination_name.strip()
     items = data_store.load("odcy_mappings.json")
     for m in items:
         if m["odcy_destination_name"] == name:
-            return m.get("terminal_type") or ""
+            return m.get("odcy_terminal_type") or m.get("terminal_type") or ""
+    return ""
+
+
+def resolve_odcy_location(odcy_destination_name: Optional[str]) -> str:
+    """ODCY 도착지명 → ODCY_위치. ODCY 매핑의 odcy_location 필드 사용."""
+    if not odcy_destination_name:
+        return ""
+    name = odcy_destination_name.strip()
+    items = data_store.load("odcy_mappings.json")
+    for m in items:
+        if m["odcy_destination_name"] == name:
+            return m.get("odcy_location") or ""
     return ""
 
 
@@ -138,7 +162,8 @@ def get_all_odcy_mappings() -> list:
     return sorted(data_store.load("odcy_mappings.json"), key=lambda x: x["id"])
 
 
-def create_odcy_mapping(odcy_destination_name: str, odcy_name: str, terminal_type: str = "") -> dict:
+def create_odcy_mapping(odcy_destination_name: str, odcy_name: str,
+                        odcy_terminal_type: str = "", odcy_location: str = "") -> dict:
     items = data_store.load("odcy_mappings.json")
     if any(m["odcy_destination_name"] == odcy_destination_name.strip() for m in items):
         raise ValueError("이미 등록된 ODCY 도착지명입니다.")
@@ -146,20 +171,23 @@ def create_odcy_mapping(odcy_destination_name: str, odcy_name: str, terminal_typ
         "id": data_store.next_id(items),
         "odcy_destination_name": odcy_destination_name.strip(),
         "odcy_name": odcy_name.strip(),
-        "terminal_type": terminal_type.strip() if terminal_type else "",
+        "odcy_terminal_type": odcy_terminal_type.strip() if odcy_terminal_type else "",
+        "odcy_location": odcy_location.strip() if odcy_location else "",
     }
     items.append(obj)
     data_store.save("odcy_mappings.json", items)
     return obj
 
 
-def update_odcy_mapping(mapping_id: int, odcy_destination_name: str, odcy_name: str, terminal_type: str = "") -> Optional[dict]:
+def update_odcy_mapping(mapping_id: int, odcy_destination_name: str, odcy_name: str,
+                        odcy_terminal_type: str = "", odcy_location: str = "") -> Optional[dict]:
     items = data_store.load("odcy_mappings.json")
     for i, m in enumerate(items):
         if m["id"] == mapping_id:
             items[i]["odcy_destination_name"] = odcy_destination_name.strip()
             items[i]["odcy_name"] = odcy_name.strip()
-            items[i]["terminal_type"] = terminal_type.strip() if terminal_type else ""
+            items[i]["odcy_terminal_type"] = odcy_terminal_type.strip() if odcy_terminal_type else ""
+            items[i]["odcy_location"] = odcy_location.strip() if odcy_location else ""
             data_store.save("odcy_mappings.json", items)
             return items[i]
     return None
@@ -208,7 +236,7 @@ def delete_route(route_id: int) -> bool:
     return True
 
 
-# ─── 컨테이너 티어 ───────────────────────────────────────────────────
+# ─── 컨테이너 티어 (TRKV용) ─────────────────────────────────────────
 
 def get_all_container_tiers() -> list:
     items = data_store.load("container_tiers.json")
@@ -243,6 +271,47 @@ def update_container_tier(tier_id: int, tier_number: Optional[int]) -> Optional[
             data_store.save("container_tiers.json", items)
             return items[i]
     return None
+
+
+# ─── 컨테이너 티어 (보관료/상하차료/셔틀비용) ────────────────────────
+
+def get_all_storage_container_tiers() -> list:
+    items = data_store.load("storage_container_tiers.json")
+    return sorted(items, key=lambda x: (x.get("cont_type", ""), x.get("is_dg", False)))
+
+
+def bulk_save_storage_container_tiers(new_items: list) -> list:
+    """[{cont_type, is_dg, tier_number}, ...] 일괄 저장 (upsert)"""
+    items = data_store.load("storage_container_tiers.json")
+    results = []
+    for new in new_items:
+        existing = next(
+            (x for x in items if x["cont_type"] == new["cont_type"] and x["is_dg"] == new["is_dg"]),
+            None,
+        )
+        if existing:
+            existing["tier_number"] = new.get("tier_number")
+            results.append(existing)
+        else:
+            obj = {"id": data_store.next_id(items), **new}
+            items.append(obj)
+            results.append(obj)
+    data_store.save("storage_container_tiers.json", items)
+    return results
+
+
+def get_storage_tier_number(cont_type: Optional[str], dg_raw: Optional[str]) -> Optional[int]:
+    """보관료/상하차료/셔틀비 전용 컨테이너 티어 번호 조회."""
+    is_dg = str(dg_raw or "").strip().upper() == "X"
+    ct = str(cont_type or "").strip()
+    tiers = data_store.load("storage_container_tiers.json")
+    tier_row = next(
+        (t for t in tiers if t["cont_type"] == ct and t["is_dg"] == is_dg),
+        None,
+    )
+    if not tier_row or tier_row.get("tier_number") is None:
+        return None
+    return tier_row["tier_number"]
 
 
 # ─── 핵심 요율 조회 ──────────────────────────────────────────────────

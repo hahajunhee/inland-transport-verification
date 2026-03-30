@@ -15,8 +15,11 @@ router = APIRouter()
 # ─── Pydantic 스키마 ─────────────────────────────────────────────────
 
 class StorageRateCreate(BaseModel):
-    odcy_name:      Optional[str]   = ""
-    terminal_type:  Optional[str]   = ""
+    odcy_name:           Optional[str]   = ""
+    odcy_terminal_type:  Optional[str]   = ""
+    odcy_location:       Optional[str]   = ""
+    dest_port_type:      Optional[str]   = ""
+    dest_terminal_type:  Optional[str]   = ""
     storage_tier1:  Optional[float] = None
     storage_tier2:  Optional[float] = None
     storage_tier3:  Optional[float] = None
@@ -83,12 +86,16 @@ def download_template():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "보관료_상하차료 요율"
-    _style_header(ws, ["ODCY명", "단지구분", "보관료 단가", "상하차료 단가", "비고"], [20, 20, 14, 14, 30])
+    _style_header(ws, ["ODCY명", "odcy터미널구분", "ODCY_위치", "도착지포트구분", "도착지터미널구분",
+                       "보관료 단가", "상하차료 단가", "비고"],
+                  [20, 20, 20, 20, 20, 14, 14, 30])
     for r in rates:
-        ws.append([r.get("odcy_name", ""), r.get("zone_type", ""),
-                   r.get("storage_unit"), r.get("handling_unit"), r.get("memo", "")])
+        ws.append([r.get("odcy_name", ""), r.get("odcy_terminal_type", ""),
+                   r.get("odcy_location", ""), r.get("dest_port_type", ""),
+                   r.get("dest_terminal_type", ""),
+                   r.get("storage_tier1"), r.get("handling_tier1"), r.get("memo", "")])
     if not rates:
-        ws.append(["세방(주)", "배후단지", 10000, 8000, "예시 (등록 후 삭제)"])
+        ws.append(["세방(주)", "배후단지", "부산신항", "부산북항", "", 10000, 8000, "예시 (등록 후 삭제)"])
 
     buf = BytesIO()
     wb.save(buf)
@@ -139,7 +146,10 @@ async def upload_storage_rates(file: UploadFile = File(...)):
     success, failed, new_items, next_id = 0, [], [], 1
 
     odcy_col     = col_map.get("ODCY명")
-    zone_col     = col_map.get("단지구분")
+    term_col     = col_map.get("odcy터미널구분") if "odcy터미널구분" in col_map else (col_map.get("터미널구분") if "터미널구분" in col_map else col_map.get("단지구분"))
+    loc_col      = col_map.get("ODCY_위치")
+    dpt_col      = col_map.get("도착지포트구분")
+    dtt_col      = col_map.get("도착지터미널구분")
     storage_col  = col_map.get("보관료 단가")
     handling_col = col_map.get("상하차료 단가")
     memo_col     = col_map.get("비고")
@@ -148,20 +158,26 @@ async def upload_storage_rates(file: UploadFile = File(...)):
         def gv(col_idx):
             return row[col_idx].value if col_idx is not None else None
 
-        odcy_name    = str(gv(odcy_col) or "").strip()
-        zone_type    = str(gv(zone_col) or "").strip()
-        storage_unit = to_float(gv(storage_col))
-        handling_unit = to_float(gv(handling_col))
+        odcy_name          = str(gv(odcy_col) or "").strip()
+        odcy_terminal_type = str(gv(term_col) or "").strip()
+        odcy_location      = str(gv(loc_col) or "").strip()
+        dest_port_type     = str(gv(dpt_col) or "").strip()
+        dest_terminal_type = str(gv(dtt_col) or "").strip()
+        storage_unit       = to_float(gv(storage_col))
+        handling_unit      = to_float(gv(handling_col))
 
-        if not odcy_name and not zone_type and storage_unit is None and handling_unit is None:
+        if not odcy_name and not odcy_terminal_type and storage_unit is None and handling_unit is None:
             continue
 
         new_items.append({
             "id": next_id,
             "odcy_name": odcy_name,
-            "zone_type": zone_type,
-            "storage_unit": storage_unit,
-            "handling_unit": handling_unit,
+            "odcy_terminal_type": odcy_terminal_type,
+            "odcy_location": odcy_location,
+            "dest_port_type": dest_port_type,
+            "dest_terminal_type": dest_terminal_type,
+            "storage_tier1": storage_unit,
+            "handling_tier1": handling_unit,
             "memo": str(gv(memo_col) or "").strip(),
         })
         next_id += 1

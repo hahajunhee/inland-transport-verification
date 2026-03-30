@@ -28,6 +28,8 @@ COLUMN_MAP = {
     "ODCY 보관료":            "storage_actual",
     "ODCY 상하차료":          "handling_actual",
     "ODCY 셔틀료":            "shuttle_actual",
+    "ODCY 반입일":            "odcy_in_date",
+    "ODCY 반출일":            "odcy_out_date",
 }
 
 
@@ -75,6 +77,18 @@ def _derive_container_type(row: dict) -> str:
     type_str = "드라이" if category == "DR" else "리퍼" if category == "RF" else category
     dg_str = "위험물" if is_dg else ""
     return f"{size}{type_str}{dg_str}"
+
+
+def _parse_date(value) -> Optional[str]:
+    """날짜값을 문자열로 정규화. datetime 객체, 문자열 모두 처리."""
+    if value is None:
+        return None
+    if hasattr(value, 'strftime'):
+        return value.strftime('%Y-%m-%d')
+    s = str(value).strip()
+    if s in ("nan", "None", "NaT", ""):
+        return None
+    return s
 
 
 def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
@@ -132,6 +146,10 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
         td = str(row.get("transport_date") or "").strip()
         row["transport_date"] = td if td not in ("nan", "None", "") else None
 
+        # ODCY 반입일/반출일 파싱
+        row["odcy_in_date"] = _parse_date(row.get("odcy_in_date"))
+        row["odcy_out_date"] = _parse_date(row.get("odcy_out_date"))
+
         # 코드/이름 strip
         for field in ("pickup_code", "pickup_name", "odcy_code", "odcy_name", "odcy_destination_name", "dest_code", "dest_name", "container_no", "departure_name"):
             val = str(row.get(field) or "").strip()
@@ -173,7 +191,10 @@ def generate_results_excel(results: list) -> bytes:
         "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호",
         # TRKV
         "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
+        # 구분값 정보 (TRKV상태 우측)
+        "ODCY도착지명", "도착지명(원본)", "odcy터미널구분", "ODCY_위치", "도착지포트구분", "도착지터미널구분",
         # 보관료
+        "보관료티어", "ODCY반입일", "ODCY반출일", "보관일수",
         "보관료청구금액", "보관료예상금액", "보관료차이금액", "보관료상태",
         # 상하차료
         "상하차료청구금액", "상하차료예상금액", "상하차료차이금액", "상하차료상태",
@@ -201,6 +222,11 @@ def generate_results_excel(results: list) -> bytes:
             g("dest_code"), g("dest_name"),
             g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"), g("weekend_holiday") or "", g("tier_number"),
             g("trkv_unit_rate"), g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
+            # 구분값 정보
+            g("odcy_destination_name"), g("dest_name"),
+            g("odcy_terminal_type"), g("odcy_location"), g("dest_port_type"), g("dest_terminal_type"),
+            # 보관료
+            g("storage_tier_number"), g("odcy_in_date"), g("odcy_out_date"), g("storage_days"),
             g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
             g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),
             g("shuttle_actual"), g("shuttle_expected"), g("shuttle_diff"), g("shuttle_status"),

@@ -1,8 +1,12 @@
-from datetime import datetime
+from datetime import datetime, date
 from app import data_store
 from app.services.rate_service import find_rate
 from app.services import trkv_service
-from app.services.trkv_service import resolve_port, resolve_departure, resolve_odcy_name, resolve_terminal_type, get_trkv_details
+from app.services.trkv_service import (
+    resolve_port, resolve_port_terminal_type, resolve_departure,
+    resolve_odcy_name, resolve_terminal_type, resolve_odcy_location,
+    get_trkv_details, get_storage_tier_number,
+)
 from app.services.storage_rate_service import find_storage_rate
 
 TOLERANCE = 1.0  # 원 단위 허용 오차
@@ -15,22 +19,69 @@ CHARGES = [
 ]
 
 
+def _parse_date_value(val) -> date | None:
+    """날짜 문자열 또는 datetime 객체를 date로 변환."""
+    if val is None:
+        return None
+    if isinstance(val, date) and not isinstance(val, datetime):
+        return val
+    if isinstance(val, datetime):
+        return val.date()
+    s = str(val).strip()
+    if not s or s in ("nan", "None", "NaT"):
+        return None
+    # 다양한 날짜 형식 시도
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y%m%d"):
+        try:
+            return datetime.strptime(s[:10], fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) -> int | None:
+    """보관일수 계산: 반출일 - 반입일 (부산신항이면 -3일 추가 차감)."""
+    in_dt = _parse_date_value(odcy_in_date_str)
+    out_dt = _parse_date_value(odcy_out_date_str)
+    if in_dt is None or out_dt is None:
+        return None
+    days = (out_dt - in_dt).days
+    if odcy_location and odcy_location.strip() == "부산신항":
+        days = days - 3
+    return max(days, 0)
+
+
 def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
                    pickup_name=None, departure_name=None, dest_name=None,
                    cont_type=None, dg_raw=None, quantity=1.0, weekend_holiday="",
-                   odcy_name_resolved=None, terminal_type=None, tier_number=None):
+                   odcy_name_resolved=None, odcy_terminal_type=None,
+                   odcy_location=None, dest_port_type=None, dest_terminal_type=None,
+                   storage_tier_number=None, storage_days=None):
     if charge_type == "TRKV":
         expected = trkv_service.get_trkv_expected(
             pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity, weekend_holiday
         )
     elif charge_type in ("보관료", "상하차료", "셔틀비용"):
-        rate = find_storage_rate(odcy_name_resolved, terminal_type, tier_number)
+        rate = find_storage_rate(
+            odcy_name_resolved, odcy_terminal_type, odcy_location,
+            dest_port_type, dest_terminal_type, storage_tier_number,
+        )
         if charge_type == "보관료":
-            expected = rate.get("storage_unit")
+            unit = rate.get("storage_unit")
         elif charge_type == "상하차료":
-            expected = rate.get("handling_unit")
+            unit = rate.get("handling_unit")
         else:
-            expected = rate.get("shuttle_unit")
+            unit = rate.get("shuttle_unit")
+
+        if unit is not None:
+            # 보관료/상하차료/셔틀비: 단가 × 보관일수 × 수량
+            if storage_days is not None and storage_days >= 0:
+                expected = unit * storage_days * quantity
+            else:
+                # 일수를 계산할 수 없으면 단가만 반환 (일수=None)
+                expected = None
+        else:
+            expected = None
     else:
         rate = find_rate(charge_type, pickup_code, odcy_code, dest_code, container_type)
         expected = rate.get("unit_price") if rate else None
@@ -78,8 +129,23 @@ def run_verification(filename: str, rows: list) -> dict:
         quantity               = float(row.get("quantity") or 1.0)
         weekend_holiday        = str(row.get("weekend_holiday") or "").strip().upper()
         odcy_destination_name  = row.get("odcy_destination_name")
+
+        # ODCY 매핑 해석 (5개 키 중 3개: odcy_name, odcy_terminal_type, odcy_location)
         odcy_name_resolved     = resolve_odcy_name(odcy_destination_name or row.get("odcy_name"))
-        terminal_type          = resolve_terminal_type(odcy_destination_name)
+        odcy_terminal_type     = resolve_terminal_type(odcy_destination_name)
+        odcy_location          = resolve_odcy_location(odcy_destination_name)
+
+        # 도착지 포트 매핑 해석 (5개 키 중 2개: dest_port_type, dest_terminal_type)
+        dest_port_type         = resolve_port(dest_name)
+        dest_terminal_type     = resolve_port_terminal_type(dest_name)
+
+        # 보관료/상하차료/셔틀비 전용 컨테이너 티어
+        storage_tier_number    = get_storage_tier_number(cont_type, dg_raw)
+
+        # 보관일수 계산
+        odcy_in_date  = row.get("odcy_in_date")
+        odcy_out_date = row.get("odcy_out_date")
+        storage_days  = _calc_storage_days(odcy_in_date, odcy_out_date, odcy_location)
 
         result = {
             "id": result_id,
@@ -103,10 +169,19 @@ def run_verification(filename: str, rows: list) -> dict:
             "weekend_holiday": weekend_holiday,
             "odcy_destination_name": odcy_destination_name,
             "odcy_name_resolved": odcy_name_resolved,
-            "terminal_type": terminal_type,
+            # 구분값 정보 (5개 키)
+            "odcy_terminal_type": odcy_terminal_type,
+            "odcy_location": odcy_location,
+            "dest_port_type": dest_port_type,
+            "dest_terminal_type": dest_terminal_type,
+            # 보관료 전용 티어 + 일수
+            "storage_tier_number": storage_tier_number,
+            "odcy_in_date": odcy_in_date,
+            "odcy_out_date": odcy_out_date,
+            "storage_days": storage_days,
         }
 
-        # 티어번호 + 단가 조회 (운송 구간 정보에 표시용)
+        # 티어번호 + 단가 조회 (TRKV 운송 구간 정보에 표시용)
         trkv_details = get_trkv_details(
             pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity, weekend_holiday
         )
@@ -124,8 +199,13 @@ def run_verification(filename: str, rows: list) -> dict:
                 pickup_name=pickup_name, departure_name=departure_name, dest_name=dest_name,
                 cont_type=cont_type, dg_raw=dg_raw, quantity=quantity,
                 weekend_holiday=weekend_holiday,
-                odcy_name_resolved=odcy_name_resolved, terminal_type=terminal_type,
-                tier_number=tier_number,
+                odcy_name_resolved=odcy_name_resolved,
+                odcy_terminal_type=odcy_terminal_type,
+                odcy_location=odcy_location,
+                dest_port_type=dest_port_type,
+                dest_terminal_type=dest_terminal_type,
+                storage_tier_number=storage_tier_number,
+                storage_days=storage_days,
             )
             result[actual_key] = actual
             result[exp_key] = expected

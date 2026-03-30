@@ -113,14 +113,15 @@
             <th rowspan="2" class="sortable-th" onclick="sortBy('transport_date')">운송일자 <span class="sort-arrow">↕</span></th>
             <th colspan="11" class="th-group th-route">운송 구간 정보</th>
             <th colspan="5" class="th-group th-trkv">TRKV</th>
-            <th colspan="4" class="th-group th-storage">보관료</th>
+            <th colspan="6" class="th-group th-info">구분값 정보</th>
+            <th colspan="8" class="th-group th-storage">보관료</th>
             <th colspan="4" class="th-group th-handling">상하차료</th>
             <th colspan="4" class="th-group th-shuttle">셔틀비용</th>
             <th rowspan="2" class="sortable-th" onclick="sortBy('overall_status')">종합 <span class="sort-arrow">↕</span></th>
           </tr>
           <!-- 2행: 세부 헤더 -->
           <tr>
-            <!-- 운송 구간 정보 7열 -->
+            <!-- 운송 구간 정보 11열 -->
             <th class="th-route sortable-th" onclick="sortBy('pickup_name')">픽업지명 <span class="sort-arrow">↕</span></th>
             <th class="th-route sortable-th" onclick="sortBy('pickup_port_resolved')">픽업포트<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
             <th class="th-route sortable-th" onclick="sortBy('departure_name')">출하지명 <span class="sort-arrow">↕</span></th>
@@ -138,7 +139,18 @@
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_expected')">예상 <span class="sort-arrow">↕</span></th>
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_diff')">차이 <span class="sort-arrow">↕</span></th>
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_status')">상태 <span class="sort-arrow">↕</span></th>
-            <!-- 보관료 4열 -->
+            <!-- 구분값 정보 6열 -->
+            <th class="th-info">ODCY도착지명</th>
+            <th class="th-info">도착지명</th>
+            <th class="th-info">odcy터미널구분</th>
+            <th class="th-info">ODCY_위치</th>
+            <th class="th-info">도착지포트구분</th>
+            <th class="th-info">도착지터미널구분</th>
+            <!-- 보관료 8열 -->
+            <th class="th-storage">보관료티어</th>
+            <th class="th-storage">반입일</th>
+            <th class="th-storage">반출일</th>
+            <th class="th-storage">보관일수</th>
             <th class="th-storage">청구</th><th class="th-storage">예상</th><th class="th-storage">차이</th>
             <th class="th-storage sortable-th" onclick="sortBy('storage_status')">상태 <span class="sort-arrow">↕</span></th>
             <!-- 상하차료 4열 -->
@@ -150,7 +162,7 @@
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="32" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
+          <tr><td colspan="42" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>
@@ -187,9 +199,10 @@
   font-weight: 700;
   font-size: 12px;
 }
+.th-info { background: #f3e8ff !important; color: #6b21a8; font-size: 11px; }
 </style>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/verification.js?v=5"></script>
+<script src="/static/js/verification.js?v=6"></script>
 {% endblock %}

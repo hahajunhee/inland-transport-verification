@@ -7,11 +7,15 @@ TIER_FIELDS = [f"tier{t}" for t in TIERS]
 
 def find_storage_rate(
     odcy_name: Optional[str],
-    terminal_type: Optional[str],
+    odcy_terminal_type: Optional[str],
+    odcy_location: Optional[str],
+    dest_port_type: Optional[str],
+    dest_terminal_type: Optional[str],
     tier_number: Optional[int],
 ) -> dict:
     """
-    (ODCY명, 터미널구분) 기준으로 보관료/상하차료/셔틀비 티어 요율 조회.
+    5개 키 (ODCY명, odcy터미널구분, ODCY_위치, 포트구분, 터미널구분) 기준으로
+    보관료/상하차료/셔틀비 티어 요율 조회.
     더 구체적인(필드 수 많은) 레코드 우선 반환.
     반환: {"storage_unit": ..., "handling_unit": ..., "shuttle_unit": ...}
     """
@@ -20,7 +24,13 @@ def find_storage_rate(
     def matches(r: dict) -> bool:
         if odcy_name and r.get("odcy_name") and r["odcy_name"] != odcy_name:
             return False
-        if terminal_type and r.get("terminal_type") and r["terminal_type"] != terminal_type:
+        if odcy_terminal_type and r.get("odcy_terminal_type") and r["odcy_terminal_type"] != odcy_terminal_type:
+            return False
+        if odcy_location and r.get("odcy_location") and r["odcy_location"] != odcy_location:
+            return False
+        if dest_port_type and r.get("dest_port_type") and r["dest_port_type"] != dest_port_type:
+            return False
+        if dest_terminal_type and r.get("dest_terminal_type") and r["dest_terminal_type"] != dest_terminal_type:
             return False
         return True
 
@@ -30,8 +40,11 @@ def find_storage_rate(
 
     def specificity(r: dict) -> int:
         score = 0
-        if r.get("odcy_name"):    score += 2
-        if r.get("terminal_type"): score += 1
+        if r.get("odcy_name"):           score += 4
+        if r.get("odcy_terminal_type"):   score += 2
+        if r.get("odcy_location"):        score += 2
+        if r.get("dest_port_type"):       score += 1
+        if r.get("dest_terminal_type"):   score += 1
         return score
 
     candidates.sort(key=specificity, reverse=True)
@@ -48,7 +61,7 @@ def find_storage_rate(
 def get_all_storage_rates() -> list:
     return sorted(
         data_store.load("storage_rates.json"),
-        key=lambda x: (x.get("odcy_name", ""), x.get("terminal_type", ""), x["id"]),
+        key=lambda x: (x.get("odcy_name", ""), x.get("odcy_terminal_type", ""), x["id"]),
     )
 
 

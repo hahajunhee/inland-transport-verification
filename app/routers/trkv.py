@@ -23,7 +23,8 @@ class PortMappingCreate(BaseModel):
 class OdcyMappingCreate(BaseModel):
     odcy_destination_name: str
     odcy_name:             str
-    terminal_type:         Optional[str] = ""
+    odcy_terminal_type:    Optional[str] = ""
+    odcy_location:         Optional[str] = ""
 
 
 class DepartureMappingCreate(BaseModel):
@@ -122,14 +123,20 @@ def list_odcy_mappings():
 @router.post("/odcy-mappings", status_code=201)
 def add_odcy_mapping(body: OdcyMappingCreate):
     try:
-        return trkv_service.create_odcy_mapping(body.odcy_destination_name, body.odcy_name, body.terminal_type or "")
+        return trkv_service.create_odcy_mapping(
+            body.odcy_destination_name, body.odcy_name,
+            body.odcy_terminal_type or "", body.odcy_location or "",
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/odcy-mappings/{mapping_id}")
 def edit_odcy_mapping(mapping_id: int, body: OdcyMappingCreate):
-    obj = trkv_service.update_odcy_mapping(mapping_id, body.odcy_destination_name, body.odcy_name, body.terminal_type or "")
+    obj = trkv_service.update_odcy_mapping(
+        mapping_id, body.odcy_destination_name, body.odcy_name,
+        body.odcy_terminal_type or "", body.odcy_location or "",
+    )
     if not obj:
         raise HTTPException(status_code=404, detail="ODCY 매핑을 찾을 수 없습니다.")
     return obj
@@ -167,7 +174,7 @@ def remove_route(route_id: int):
         raise HTTPException(status_code=404, detail="구간 요율을 찾을 수 없습니다.")
 
 
-# ─── 컨테이너 티어 ───────────────────────────────────────────────────
+# ─── 컨테이너 티어 (TRKV) ───────────────────────────────────────────
 
 @router.get("/container-tiers")
 def list_container_tiers():
@@ -185,6 +192,18 @@ def edit_container_tier(tier_id: int, tier_number: Optional[int] = None):
     if not obj:
         raise HTTPException(status_code=404, detail="컨테이너 티어를 찾을 수 없습니다.")
     return obj
+
+
+# ─── 컨테이너 티어 (보관료/상하차료/셔틀비) ──────────────────────────
+
+@router.get("/storage-container-tiers")
+def list_storage_container_tiers():
+    return trkv_service.get_all_storage_container_tiers()
+
+
+@router.post("/storage-container-tiers/bulk")
+def save_storage_container_tiers(body: ContainerTierBulk):
+    return trkv_service.bulk_save_storage_container_tiers([i.model_dump() for i in body.items])
 
 
 # ─── 통합 엑셀 템플릿 (현재 등록된 데이터 포함) ───────────────────────
@@ -233,11 +252,15 @@ def download_unified_template():
 
     # ── Sheet 3: ODCY 매핑 ───────────────────────────────────────────
     ws_om = wb.create_sheet("ODCY 매핑")
-    _style_header(ws_om, ["ODCY 도착지명 (엑셀 원본명)", "ODCY명", "터미널구분"], [35, 20, 20])
+    _style_header(ws_om, ["ODCY 도착지명 (엑셀 원본명)", "ODCY명", "odcy터미널구분", "ODCY_위치"], [35, 20, 20, 20])
     for om in odcy_mappings:
-        ws_om.append([om["odcy_destination_name"], om["odcy_name"], om.get("terminal_type", "")])
+        ws_om.append([
+            om["odcy_destination_name"], om["odcy_name"],
+            om.get("odcy_terminal_type") or om.get("terminal_type", ""),
+            om.get("odcy_location", ""),
+        ])
     if not odcy_mappings:
-        ws_om.append(["SB청암", "세방(주)", "배후단지"])
+        ws_om.append(["SB청암", "세방(주)", "배후단지", "부산신항"])
 
     # ── Sheet 4: TRKV 구간 요율 ──────────────────────────────────────
     ws_rt = wb.create_sheet("TRKV 구간 요율")
@@ -261,15 +284,19 @@ def download_unified_template():
     # ── Sheet 5: 보관료_상하차료_셔틀비 요율 ──────────────────────────
     ws_sr = wb.create_sheet("보관료_상하차료_셔틀비 요율")
     _style_header(ws_sr, [
-        "ODCY명", "터미널구분",
+        "ODCY명", "odcy터미널구분", "ODCY_위치", "도착지포트구분", "도착지터미널구분",
         "보관료_T1", "보관료_T2", "보관료_T3", "보관료_T4", "보관료_T5", "보관료_T6",
         "상하차료_T1", "상하차료_T2", "상하차료_T3", "상하차료_T4", "상하차료_T5", "상하차료_T6",
         "셔틀비_T1", "셔틀비_T2", "셔틀비_T3", "셔틀비_T4", "셔틀비_T5", "셔틀비_T6",
         "비고",
-    ], [18, 18] + [11]*18 + [25])
+    ], [18, 18, 18, 18, 18] + [11]*18 + [25])
     for sr in storage_rates:
         ws_sr.append([
-            sr.get("odcy_name", ""), sr.get("terminal_type", ""),
+            sr.get("odcy_name", ""),
+            sr.get("odcy_terminal_type") or sr.get("terminal_type", ""),
+            sr.get("odcy_location", ""),
+            sr.get("dest_port_type", ""),
+            sr.get("dest_terminal_type", ""),
             sr.get("storage_tier1"), sr.get("storage_tier2"), sr.get("storage_tier3"),
             sr.get("storage_tier4"), sr.get("storage_tier5"), sr.get("storage_tier6"),
             sr.get("handling_tier1"), sr.get("handling_tier2"), sr.get("handling_tier3"),
@@ -279,7 +306,7 @@ def download_unified_template():
             sr.get("memo", ""),
         ])
     if not storage_rates:
-        ws_sr.append(["세방(주)", "배후단지",
+        ws_sr.append(["세방(주)", "배후단지", "부산신항", "부산북항", "",
                       10000, 11000, 12000, None, None, None,
                       8000,  9000,  10000, None, None, None,
                       5000,  6000,  7000,  None, None, None,
@@ -397,14 +424,17 @@ def _process_upload(wb):
         )
         dest_col = col_map.get("ODCY 도착지명 (엑셀 원본명)") if "ODCY 도착지명 (엑셀 원본명)" in col_map else col_map.get("ODCY 도착지명")
         name_col = col_map.get("ODCY명")
-        term_col_om = col_map.get("터미널구분")
+        # 새 필드명 우선, 구버전 fallback
+        term_col_om = col_map.get("odcy터미널구분") if "odcy터미널구분" in col_map else col_map.get("터미널구분")
+        loc_col = col_map.get("ODCY_위치")
         if has_data and dest_col is not None and name_col is not None:
             data_store.save("odcy_mappings.json", [])
             success, failed, new_items, next_id = 0, [], [], 1
             for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
                 odcy_dest     = row[dest_col].value
                 odcy_name     = row[name_col].value
-                terminal_type = row[term_col_om].value if term_col_om is not None else None
+                odcy_term     = row[term_col_om].value if term_col_om is not None else None
+                odcy_loc      = row[loc_col].value if loc_col is not None else None
                 if not odcy_dest and not odcy_name:
                     continue
                 if not odcy_dest or not odcy_name:
@@ -414,7 +444,8 @@ def _process_upload(wb):
                     "id": next_id,
                     "odcy_destination_name": str(odcy_dest).strip(),
                     "odcy_name": str(odcy_name).strip(),
-                    "terminal_type": str(terminal_type).strip() if terminal_type else "",
+                    "odcy_terminal_type": str(odcy_term).strip() if odcy_term else "",
+                    "odcy_location": str(odcy_loc).strip() if odcy_loc else "",
                 })
                 next_id += 1; success += 1
             data_store.save("odcy_mappings.json", new_items)
@@ -481,18 +512,32 @@ def _process_upload(wb):
             if has_data and tier_keys:
                 data_store.save("storage_rates.json", [])
                 odcy_col  = col_map.get("ODCY명")
-                term_col2 = col_map.get("터미널구분") if "터미널구분" in col_map else col_map.get("단지구분")
+                # 새 필드명 우선, 구버전 fallback
+                term_col2 = col_map.get("odcy터미널구분") if "odcy터미널구분" in col_map else (col_map.get("터미널구분") if "터미널구분" in col_map else col_map.get("단지구분"))
+                loc_col2  = col_map.get("ODCY_위치")
+                dpt_col   = col_map.get("도착지포트구분")
+                dtt_col   = col_map.get("도착지터미널구분")
                 memo_col  = col_map.get("비고")
                 success, failed, new_items, next_id = 0, [], [], 1
                 for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
                     def _gv2(col_idx, _row=row):
                         return _row[col_idx].value if col_idx is not None else None
-                    odcy_name     = str(_gv2(odcy_col) or "").strip()
-                    terminal_type = str(_gv2(term_col2) or "").strip()
+                    odcy_name          = str(_gv2(odcy_col) or "").strip()
+                    odcy_terminal_type = str(_gv2(term_col2) or "").strip()
+                    odcy_location      = str(_gv2(loc_col2) or "").strip()
+                    dest_port_type     = str(_gv2(dpt_col) or "").strip()
+                    dest_terminal_type = str(_gv2(dtt_col) or "").strip()
                     # 티어 컬럼 수집
                     sr_cols = {"보관료_T": "storage_tier", "상하차료_T": "handling_tier", "셔틀비_T": "shuttle_tier"}
-                    obj = {"id": next_id, "odcy_name": odcy_name, "terminal_type": terminal_type,
-                           "memo": str(_gv2(memo_col) or "").strip()}
+                    obj = {
+                        "id": next_id,
+                        "odcy_name": odcy_name,
+                        "odcy_terminal_type": odcy_terminal_type,
+                        "odcy_location": odcy_location,
+                        "dest_port_type": dest_port_type,
+                        "dest_terminal_type": dest_terminal_type,
+                        "memo": str(_gv2(memo_col) or "").strip(),
+                    }
                     all_none = True
                     for prefix, key in sr_cols.items():
                         for t in range(1, 7):
@@ -508,7 +553,7 @@ def _process_upload(wb):
                     if "상하차료 단가" in col_map:
                         v = to_float(_gv2(col_map["상하차료 단가"]))
                         obj["handling_tier1"] = v; all_none = all_none and (v is None)
-                    if not odcy_name and not terminal_type and all_none:
+                    if not odcy_name and not odcy_terminal_type and all_none:
                         continue
                     new_items.append(obj)
                     next_id += 1; success += 1

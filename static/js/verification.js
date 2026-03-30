@@ -1,10 +1,10 @@
-/* ─── 정산 검증 페이지 스크립트 v5 ─── */
+/* ─── 정산 검증 페이지 스크립트 v6 ─── */
 
 let currentSessionId = null;
 let currentFilter = "ALL";
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
-const EMPTY_COLS = 32;     // colspan for empty message
+const EMPTY_COLS = 42;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -216,6 +216,13 @@ function renderRow(r) {
     ? `<span class="wh-badge">X</span>`
     : `<span style="color:#9ca3af">-</span>`;
 
+  // 보관료 전용 티어
+  const storageTierBadge = r.storage_tier_number != null
+    ? `<span class="tier-badge">T${r.storage_tier_number}</span>`
+    : `<span class="tier-none">-</span>`;
+
+  const storageDays = r.storage_days != null ? r.storage_days : "-";
+
   return `<tr class="${rowClass}">
     <td>${r.row_number}</td>
     <td>${r.container_no || "-"}</td>
@@ -235,7 +242,18 @@ function renderRow(r) {
     <!-- TRKV (5열: 단가 + 청구 + 예상 + 차이 + 상태) -->
     <td class="money trkv-unit">${unitRate}</td>
     ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status)}
-    <!-- 보관료 -->
+    <!-- 구분값 정보 (6열) -->
+    <td class="td-info">${r.odcy_destination_name || "-"}</td>
+    <td class="td-info">${r.dest_name || "-"}</td>
+    <td class="td-info">${r.odcy_terminal_type || "-"}</td>
+    <td class="td-info">${r.odcy_location || "-"}</td>
+    <td class="td-info">${r.dest_port_type || "-"}</td>
+    <td class="td-info">${r.dest_terminal_type || "-"}</td>
+    <!-- 보관료 (8열: 티어 + 반입일 + 반출일 + 일수 + 청구 + 예상 + 차이 + 상태) -->
+    <td class="td-tier">${storageTierBadge}</td>
+    <td style="font-size:11px">${r.odcy_in_date || "-"}</td>
+    <td style="font-size:11px">${r.odcy_out_date || "-"}</td>
+    <td class="td-center">${storageDays}</td>
     ${chargeCell(r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status)}
     <!-- 상하차료 -->
     ${chargeCell(r.handling_actual, r.handling_expected, r.handling_diff, r.handling_status)}
