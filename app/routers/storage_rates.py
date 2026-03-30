@@ -15,11 +15,27 @@ router = APIRouter()
 # ─── Pydantic 스키마 ─────────────────────────────────────────────────
 
 class StorageRateCreate(BaseModel):
-    odcy_name: Optional[str] = ""
-    zone_type: Optional[str] = ""
-    storage_unit: Optional[float] = None    # 보관료 단가
-    handling_unit: Optional[float] = None   # 상하차료 단가
-    memo: Optional[str] = ""
+    odcy_name:      Optional[str]   = ""
+    terminal_type:  Optional[str]   = ""
+    storage_tier1:  Optional[float] = None
+    storage_tier2:  Optional[float] = None
+    storage_tier3:  Optional[float] = None
+    storage_tier4:  Optional[float] = None
+    storage_tier5:  Optional[float] = None
+    storage_tier6:  Optional[float] = None
+    handling_tier1: Optional[float] = None
+    handling_tier2: Optional[float] = None
+    handling_tier3: Optional[float] = None
+    handling_tier4: Optional[float] = None
+    handling_tier5: Optional[float] = None
+    handling_tier6: Optional[float] = None
+    shuttle_tier1:  Optional[float] = None
+    shuttle_tier2:  Optional[float] = None
+    shuttle_tier3:  Optional[float] = None
+    shuttle_tier4:  Optional[float] = None
+    shuttle_tier5:  Optional[float] = None
+    shuttle_tier6:  Optional[float] = None
+    memo:           Optional[str]   = ""
 
 
 # ─── CRUD ─────────────────────────────────────────────────────────

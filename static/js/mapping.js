@@ -1,4 +1,4 @@
-/* ─── 매핑설정 페이지 스크립트 v4 ─── */
+/* ─── 매핑설정 페이지 스크립트 v5 ─── */
 
 function showMsg(elId, msg, isOk) {
   const el = document.getElementById(elId);
@@ -25,9 +25,9 @@ async function loadPortMappings(prevSnapshot) {
       const prevMap = new Map(prevSnapshot.map(r => [r.id, r]));
       for (const r of pmData) {
         const prev = prevMap.get(r.id);
-        if (!prev || String(r.excel_name ?? "") !== String(prev.excel_name ?? "")
-                  || String(r.port_type  ?? "") !== String(prev.port_type   ?? "")
-                  || String(r.zone_type  ?? "") !== String(prev.zone_type   ?? "")) {
+        if (!prev || String(r.excel_name     ?? "") !== String(prev.excel_name     ?? "")
+                  || String(r.port_type     ?? "") !== String(prev.port_type     ?? "")
+                  || String(r.terminal_type ?? "") !== String(prev.terminal_type ?? "")) {
           changedPmIds.add(r.id);
         }
       }
@@ -52,7 +52,7 @@ function renderPm() {
       <td>${i + 1}</td>
       <td>${d.excel_name}</td>
       <td>${d.port_type}</td>
-      <td>${d.zone_type ? `<span class="badge badge-green">${d.zone_type}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
+      <td>${d.terminal_type ? `<span class="badge badge-green">${d.terminal_type}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
       <td>
         <button class="btn btn-sm btn-outline" onclick="startPmEdit(${d.id})">수정</button>
         <button class="btn btn-sm btn-danger"  onclick="deletePm(${d.id})">삭제</button>
@@ -89,19 +89,19 @@ async function deleteSelectedPm() {
 function startPmEdit(id) {
   const d = pmData.find(x => x.id === id);
   if (!d) return;
-  document.getElementById("pm-edit-id").value    = id;
-  document.getElementById("pm-excel-name").value = d.excel_name;
-  document.getElementById("pm-port-type").value  = d.port_type;
-  document.getElementById("pm-zone-type").value  = d.zone_type || "";
+  document.getElementById("pm-edit-id").value       = id;
+  document.getElementById("pm-excel-name").value    = d.excel_name;
+  document.getElementById("pm-port-type").value     = d.port_type;
+  document.getElementById("pm-terminal-type").value = d.terminal_type || "";
   document.getElementById("pm-submit-btn").textContent = "수정";
   document.getElementById("pm-cancel-btn").style.display = "inline-flex";
 }
 
 function cancelPmEdit() {
-  document.getElementById("pm-edit-id").value    = "";
-  document.getElementById("pm-excel-name").value = "";
-  document.getElementById("pm-port-type").value  = "";
-  document.getElementById("pm-zone-type").value  = "";
+  document.getElementById("pm-edit-id").value       = "";
+  document.getElementById("pm-excel-name").value    = "";
+  document.getElementById("pm-port-type").value     = "";
+  document.getElementById("pm-terminal-type").value = "";
   document.getElementById("pm-submit-btn").textContent = "추가";
   document.getElementById("pm-cancel-btn").style.display = "none";
 }
@@ -110,9 +110,9 @@ document.getElementById("pm-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const editId = document.getElementById("pm-edit-id").value;
   const body   = {
-    excel_name: document.getElementById("pm-excel-name").value.trim(),
-    port_type:  document.getElementById("pm-port-type").value.trim(),
-    zone_type:  document.getElementById("pm-zone-type").value.trim(),
+    excel_name:    document.getElementById("pm-excel-name").value.trim(),
+    port_type:     document.getElementById("pm-port-type").value.trim(),
+    terminal_type: document.getElementById("pm-terminal-type").value.trim(),
   };
   if (!body.excel_name || !body.port_type) return;
   const url    = editId ? `/api/trkv/port-mappings/${editId}` : "/api/trkv/port-mappings";
@@ -331,7 +331,8 @@ async function loadOdcyMappings(prevSnapshot) {
       for (const r of omData) {
         const prev = prevMap.get(r.id);
         if (!prev || String(r.odcy_destination_name ?? "") !== String(prev.odcy_destination_name ?? "")
-                  || String(r.odcy_name ?? "") !== String(prev.odcy_name ?? "")) {
+                  || String(r.odcy_name        ?? "") !== String(prev.odcy_name        ?? "")
+                  || String(r.terminal_type    ?? "") !== String(prev.terminal_type    ?? "")) {
           changedOmIds.add(r.id);
         }
       }
@@ -356,6 +357,7 @@ function renderOm() {
       <td>${i + 1}</td>
       <td>${d.odcy_destination_name}</td>
       <td><span class="badge badge-blue">${d.odcy_name}</span></td>
+      <td>${d.terminal_type ? `<span class="badge badge-green">${d.terminal_type}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
       <td>
         <button class="btn btn-sm btn-outline" onclick="startOmEdit(${d.id})">수정</button>
         <button class="btn btn-sm btn-danger"  onclick="deleteOm(${d.id})">삭제</button>
@@ -392,17 +394,19 @@ async function deleteSelectedOm() {
 function startOmEdit(id) {
   const d = omData.find(x => x.id === id);
   if (!d) return;
-  document.getElementById("om-edit-id").value    = id;
-  document.getElementById("om-dest-name").value  = d.odcy_destination_name;
-  document.getElementById("om-odcy-name").value  = d.odcy_name;
+  document.getElementById("om-edit-id").value        = id;
+  document.getElementById("om-dest-name").value      = d.odcy_destination_name;
+  document.getElementById("om-odcy-name").value      = d.odcy_name;
+  document.getElementById("om-terminal-type").value  = d.terminal_type || "";
   document.getElementById("om-submit-btn").textContent = "수정";
   document.getElementById("om-cancel-btn").style.display = "inline-flex";
 }
 
 function cancelOmEdit() {
-  document.getElementById("om-edit-id").value   = "";
-  document.getElementById("om-dest-name").value = "";
-  document.getElementById("om-odcy-name").value = "";
+  document.getElementById("om-edit-id").value       = "";
+  document.getElementById("om-dest-name").value     = "";
+  document.getElementById("om-odcy-name").value     = "";
+  document.getElementById("om-terminal-type").value = "";
   document.getElementById("om-submit-btn").textContent = "추가";
   document.getElementById("om-cancel-btn").style.display = "none";
 }
@@ -413,6 +417,7 @@ document.getElementById("om-form").addEventListener("submit", async (e) => {
   const body   = {
     odcy_destination_name: document.getElementById("om-dest-name").value.trim(),
     odcy_name:             document.getElementById("om-odcy-name").value.trim(),
+    terminal_type:         document.getElementById("om-terminal-type").value.trim(),
   };
   if (!body.odcy_destination_name || !body.odcy_name) return;
   const url    = editId ? `/api/trkv/odcy-mappings/${editId}` : "/api/trkv/odcy-mappings";

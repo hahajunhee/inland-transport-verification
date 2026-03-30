@@ -37,8 +37,8 @@
         <input type="text" id="pm-port-type" placeholder="예: 부산신항, 부산북항" required />
       </div>
       <div class="form-group">
-        <label>단지구분 <span style="color:#6b7280;font-size:12px">(보관료/상하차료 기준)</span></label>
-        <input type="text" id="pm-zone-type" placeholder="예: 배후단지, 일반" />
+        <label>터미널구분 <span style="color:#6b7280;font-size:12px">(선택)</span></label>
+        <input type="text" id="pm-terminal-type" placeholder="예: 신선대, 감만" />
       </div>
       <div class="form-group form-group-btn">
         <label>&nbsp;</label>
@@ -56,7 +56,7 @@
       <thead>
         <tr>
           <th><input type="checkbox" id="pm-check-all" onchange="toggleAllPmCheck(this.checked)" /></th>
-          <th>#</th><th>엑셀 원본 명칭</th><th>포트 구분</th><th>단지구분</th><th>관리</th>
+          <th>#</th><th>엑셀 원본 명칭</th><th>포트 구분</th><th>터미널구분</th><th>관리</th>
         </tr>
       </thead>
       <tbody id="pm-tbody">
@@ -136,6 +136,10 @@
         <label>ODCY명 <span class="required">*</span></label>
         <input type="text" id="om-odcy-name" placeholder="예: 세방(주), 한진" required />
       </div>
+      <div class="form-group">
+        <label>터미널구분 <span style="color:#6b7280;font-size:12px">(보관료/셔틀비 기준)</span></label>
+        <input type="text" id="om-terminal-type" placeholder="예: 배후단지, 일반" />
+      </div>
       <div class="form-group form-group-btn">
         <label>&nbsp;</label>
         <div class="btn-row">
@@ -152,11 +156,11 @@
       <thead>
         <tr>
           <th><input type="checkbox" id="om-check-all" onchange="toggleAllOmCheck(this.checked)" /></th>
-          <th>#</th><th>ODCY 도착지명 (엑셀 원본명)</th><th>ODCY명</th><th>관리</th>
+          <th>#</th><th>ODCY 도착지명 (엑셀 원본명)</th><th>ODCY명</th><th>터미널구분</th><th>관리</th>
         </tr>
       </thead>
       <tbody id="om-tbody">
-        <tr><td colspan="5" class="empty-msg">불러오는 중...</td></tr>
+        <tr><td colspan="6" class="empty-msg">불러오는 중...</td></tr>
       </tbody>
     </table>
   </div>
@@ -185,5 +189,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/mapping.js?v=4"></script>
+<script src="/static/js/mapping.js?v=5"></script>
 {% endblock %}

@@ -1,4 +1,6 @@
-/* ─── 보관료/상하차료 요율 페이지 스크립트 v2 ─── */
+/* ─── 보관료/상하차료/셔틀비 요율 페이지 스크립트 v3 ─── */
+
+const TIERS = [1, 2, 3, 4, 5, 6];
 
 function showMsg(elId, msg, isOk) {
   const el = document.getElementById(elId);
@@ -10,7 +12,7 @@ function showMsg(elId, msg, isOk) {
 }
 
 function fmtMoney(v) {
-  if (v == null) return "-";
+  if (v == null || v === "") return '<span style="color:#d1d5db">-</span>';
   return Number(v).toLocaleString("ko-KR");
 }
 
@@ -24,7 +26,7 @@ async function loadStorageRates() {
     renderSr();
   } catch {
     const tbody = document.getElementById("sr-tbody");
-    if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="empty-msg" style="color:#ef4444">불러오기 실패</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="22" class="empty-msg" style="color:#ef4444">불러오기 실패</td></tr>';
   }
 }
 
@@ -32,23 +34,28 @@ function renderSr() {
   const tbody = document.getElementById("sr-tbody");
   if (!tbody) return;
   if (!srData.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">등록된 요율이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="22" class="empty-msg">등록된 요율이 없습니다.</td></tr>';
     updateSrSelCount(); return;
   }
-  tbody.innerHTML = srData.map((d, i) => `
-    <tr>
+  tbody.innerHTML = srData.map((d, i) => {
+    const storageCells  = TIERS.map(t => `<td class="money">${fmtMoney(d[`storage_tier${t}`])}</td>`).join("");
+    const handlingCells = TIERS.map(t => `<td class="money">${fmtMoney(d[`handling_tier${t}`])}</td>`).join("");
+    const shuttleCells  = TIERS.map(t => `<td class="money">${fmtMoney(d[`shuttle_tier${t}`])}</td>`).join("");
+    return `<tr>
       <td><input type="checkbox" class="sr-chk" data-id="${d.id}" onchange="updateSrSelCount()" /></td>
       <td>${i + 1}</td>
       <td>${d.odcy_name || '<span style="color:#9ca3af">-</span>'}</td>
-      <td>${d.zone_type ? `<span class="badge badge-green">${d.zone_type}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
-      <td class="money">${fmtMoney(d.storage_unit)}</td>
-      <td class="money">${fmtMoney(d.handling_unit)}</td>
+      <td>${d.terminal_type ? `<span class="badge badge-green">${d.terminal_type}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
+      ${storageCells}
+      ${handlingCells}
+      ${shuttleCells}
       <td style="font-size:12px;color:#6b7280">${d.memo || ""}</td>
       <td>
         <button class="btn btn-sm btn-outline" onclick="startSrEdit(${d.id})">수정</button>
         <button class="btn btn-sm btn-danger"  onclick="deleteSr(${d.id})">삭제</button>
       </td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
   updateSrSelCount();
 }
 
@@ -80,40 +87,61 @@ async function deleteSelectedSr() {
 function startSrEdit(id) {
   const d = srData.find(x => x.id === id);
   if (!d) return;
-  document.getElementById("sr-edit-id").value       = id;
-  document.getElementById("sr-odcy-name").value     = d.odcy_name || "";
-  document.getElementById("sr-zone-type").value     = d.zone_type || "";
-  document.getElementById("sr-storage-unit").value  = d.storage_unit ?? "";
-  document.getElementById("sr-handling-unit").value = d.handling_unit ?? "";
-  document.getElementById("sr-memo").value          = d.memo || "";
+  document.getElementById("sr-edit-id").value        = id;
+  document.getElementById("sr-odcy-name").value      = d.odcy_name || "";
+  document.getElementById("sr-terminal-type").value  = d.terminal_type || "";
+  document.getElementById("sr-memo").value           = d.memo || "";
+  for (const t of TIERS) {
+    const sv = d[`storage_tier${t}`];
+    const hv = d[`handling_tier${t}`];
+    const shv = d[`shuttle_tier${t}`];
+    document.getElementById(`sr-storage-tier${t}`).value  = sv != null ? sv : "";
+    document.getElementById(`sr-handling-tier${t}`).value = hv != null ? hv : "";
+    document.getElementById(`sr-shuttle-tier${t}`).value  = shv != null ? shv : "";
+  }
   document.getElementById("sr-submit-btn").textContent = "수정";
   document.getElementById("sr-cancel-btn").style.display = "inline-flex";
+  document.getElementById("sr-form").scrollIntoView({ behavior: "smooth" });
 }
 
 function cancelSrEdit() {
   document.getElementById("sr-edit-id").value       = "";
   document.getElementById("sr-odcy-name").value     = "";
-  document.getElementById("sr-zone-type").value     = "";
-  document.getElementById("sr-storage-unit").value  = "";
-  document.getElementById("sr-handling-unit").value = "";
+  document.getElementById("sr-terminal-type").value = "";
   document.getElementById("sr-memo").value          = "";
+  for (const t of TIERS) {
+    document.getElementById(`sr-storage-tier${t}`).value  = "";
+    document.getElementById(`sr-handling-tier${t}`).value = "";
+    document.getElementById(`sr-shuttle-tier${t}`).value  = "";
+  }
   document.getElementById("sr-submit-btn").textContent = "추가";
   document.getElementById("sr-cancel-btn").style.display = "none";
+}
+
+function buildBody() {
+  const body = {
+    odcy_name:     document.getElementById("sr-odcy-name").value.trim(),
+    terminal_type: document.getElementById("sr-terminal-type").value.trim(),
+    memo:          document.getElementById("sr-memo").value.trim(),
+  };
+  for (const t of TIERS) {
+    const sv  = document.getElementById(`sr-storage-tier${t}`).value;
+    const hv  = document.getElementById(`sr-handling-tier${t}`).value;
+    const shv = document.getElementById(`sr-shuttle-tier${t}`).value;
+    body[`storage_tier${t}`]  = sv  !== "" ? parseFloat(sv)  : null;
+    body[`handling_tier${t}`] = hv  !== "" ? parseFloat(hv)  : null;
+    body[`shuttle_tier${t}`]  = shv !== "" ? parseFloat(shv) : null;
+  }
+  return body;
 }
 
 document.getElementById("sr-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const editId = document.getElementById("sr-edit-id").value;
-  const su = document.getElementById("sr-storage-unit").value;
-  const hu = document.getElementById("sr-handling-unit").value;
-  const body = {
-    odcy_name:     document.getElementById("sr-odcy-name").value.trim(),
-    zone_type:     document.getElementById("sr-zone-type").value.trim(),
-    storage_unit:  su !== "" ? parseFloat(su) : null,
-    handling_unit: hu !== "" ? parseFloat(hu) : null,
-    memo:          document.getElementById("sr-memo").value.trim(),
-  };
-  if (!body.odcy_name || !body.zone_type) return;
+  const body   = buildBody();
+  if (!body.odcy_name || !body.terminal_type) {
+    showMsg("sr-msg", "ODCY명과 터미널구분은 필수입니다.", false); return;
+  }
   const url    = editId ? `/api/storage-rates/${editId}` : "/api/storage-rates/";
   const method = editId ? "PUT" : "POST";
   const res    = await fetch(url, { method, headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
@@ -134,7 +162,6 @@ async function deleteSr(id) {
 }
 
 function downloadTemplate() {
-  // 전체 통합 양식 (5개 시트) 다운로드
   window.location.href = "/api/trkv/template";
 }
 
@@ -152,19 +179,18 @@ async function uploadRates() {
   msgEl.style.display = "inline";
 
   try {
-    // 통합 업로드 엔드포인트 사용 (모든 시트 전체 교체)
     const res  = await fetch("/api/trkv/upload", { method: "POST", body: fd });
     const data = await res.json();
     if (res.ok) {
       const sheets = data.sheets || {};
-      const srSheet = sheets["보관료_상하차료 요율"];
-      if (srSheet) {
-        const fails = srSheet.failed?.length || 0;
-        msgEl.textContent = `완료 — 보관료/상하차료 ${srSheet.success}건 교체` + (fails ? ` (오류 ${fails}건)` : "");
+      const srKey  = Object.keys(sheets).find(k => k.includes("보관료") || k.includes("셔틀"));
+      if (srKey) {
+        const s = sheets[srKey];
+        const fails = s.failed?.length || 0;
+        msgEl.textContent = `완료 — ${srKey} ${s.success}건 교체` + (fails ? ` (오류 ${fails}건)` : "");
       } else {
-        // 다른 시트만 처리됐어도 성공으로 표시
-        const totalSuccess = Object.values(sheets).reduce((acc, s) => acc + (s.success || 0), 0);
-        msgEl.textContent = `완료 — 전체 ${totalSuccess}건 교체 (보관료 시트 없음)`;
+        const total = Object.values(sheets).reduce((a, s) => a + (s.success || 0), 0);
+        msgEl.textContent = `완료 — 전체 ${total}건 교체 (보관료 시트 없음)`;
       }
       msgEl.className = "upload-result ok";
       loadStorageRates();

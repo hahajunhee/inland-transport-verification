@@ -15,14 +15,15 @@ router = APIRouter()
 # ─── Pydantic 스키마 ─────────────────────────────────────────────────
 
 class PortMappingCreate(BaseModel):
-    excel_name: str
-    port_type: str
-    zone_type: Optional[str] = ""
+    excel_name:    str
+    port_type:     str
+    terminal_type: Optional[str] = ""
 
 
 class OdcyMappingCreate(BaseModel):
     odcy_destination_name: str
-    odcy_name: str
+    odcy_name:             str
+    terminal_type:         Optional[str] = ""
 
 
 class DepartureMappingCreate(BaseModel):
@@ -63,14 +64,14 @@ def list_port_mappings():
 @router.post("/port-mappings", status_code=201)
 def add_port_mapping(body: PortMappingCreate):
     try:
-        return trkv_service.create_port_mapping(body.excel_name, body.port_type, body.zone_type or "")
+        return trkv_service.create_port_mapping(body.excel_name, body.port_type, body.terminal_type or "")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/port-mappings/{mapping_id}")
 def edit_port_mapping(mapping_id: int, body: PortMappingCreate):
-    obj = trkv_service.update_port_mapping(mapping_id, body.excel_name, body.port_type, body.zone_type or "")
+    obj = trkv_service.update_port_mapping(mapping_id, body.excel_name, body.port_type, body.terminal_type or "")
     if not obj:
         raise HTTPException(status_code=404, detail="포트 매핑을 찾을 수 없습니다.")
     return obj
@@ -121,14 +122,14 @@ def list_odcy_mappings():
 @router.post("/odcy-mappings", status_code=201)
 def add_odcy_mapping(body: OdcyMappingCreate):
     try:
-        return trkv_service.create_odcy_mapping(body.odcy_destination_name, body.odcy_name)
+        return trkv_service.create_odcy_mapping(body.odcy_destination_name, body.odcy_name, body.terminal_type or "")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/odcy-mappings/{mapping_id}")
 def edit_odcy_mapping(mapping_id: int, body: OdcyMappingCreate):
-    obj = trkv_service.update_odcy_mapping(mapping_id, body.odcy_destination_name, body.odcy_name)
+    obj = trkv_service.update_odcy_mapping(mapping_id, body.odcy_destination_name, body.odcy_name, body.terminal_type or "")
     if not obj:
         raise HTTPException(status_code=404, detail="ODCY 매핑을 찾을 수 없습니다.")
     return obj
@@ -213,12 +214,13 @@ def download_unified_template():
     # ── Sheet 1: 포트명 매핑 ─────────────────────────────────────────
     ws_pm = wb.active
     ws_pm.title = "포트명 매핑"
-    _style_header(ws_pm, ["엑셀 원본명", "포트 구분", "단지구분"], [30, 15, 20])
+    _style_header(ws_pm, ["엑셀 원본명", "포트 구분", "터미널구분"], [30, 15, 20])
     for pm in port_mappings:
-        ws_pm.append([pm["excel_name"], pm["port_type"], pm.get("zone_type", "")])
+        ws_pm.append([pm["excel_name"], pm["port_type"],
+                      pm.get("terminal_type") or pm.get("zone_type", "")])
     if not port_mappings:
         ws_pm.append(["부산신항BPTS", "부산신항", ""])
-        ws_pm.append(["북컨배후단지", "부산북항", "배후단지"])
+        ws_pm.append(["북컨배후단지", "부산북항", ""])
 
     # ── Sheet 2: 출하지 매핑 ─────────────────────────────────────────
     ws_dm = wb.create_sheet("출하지 매핑")
@@ -231,11 +233,11 @@ def download_unified_template():
 
     # ── Sheet 3: ODCY 매핑 ───────────────────────────────────────────
     ws_om = wb.create_sheet("ODCY 매핑")
-    _style_header(ws_om, ["ODCY 도착지명 (엑셀 원본명)", "ODCY명"], [35, 20])
+    _style_header(ws_om, ["ODCY 도착지명 (엑셀 원본명)", "ODCY명", "터미널구분"], [35, 20, 20])
     for om in odcy_mappings:
-        ws_om.append([om["odcy_destination_name"], om["odcy_name"]])
+        ws_om.append([om["odcy_destination_name"], om["odcy_name"], om.get("terminal_type", "")])
     if not odcy_mappings:
-        ws_om.append(["SB청암", "세방(주)"])
+        ws_om.append(["SB청암", "세방(주)", "배후단지"])
 
     # ── Sheet 4: TRKV 구간 요율 ──────────────────────────────────────
     ws_rt = wb.create_sheet("TRKV 구간 요율")
@@ -256,16 +258,32 @@ def download_unified_template():
     if not routes:
         ws_rt.append(["부산신항", "AS", "부산북항", 100000, 110000, 120000, 130000, 140000, 150000, "예시 (등록 후 삭제)"])
 
-    # ── Sheet 5: 보관료_상하차료 요율 ────────────────────────────────
-    ws_sr = wb.create_sheet("보관료_상하차료 요율")
-    _style_header(ws_sr, ["ODCY명", "단지구분", "보관료 단가", "상하차료 단가", "비고"], [20, 20, 14, 14, 30])
+    # ── Sheet 5: 보관료_상하차료_셔틀비 요율 ──────────────────────────
+    ws_sr = wb.create_sheet("보관료_상하차료_셔틀비 요율")
+    _style_header(ws_sr, [
+        "ODCY명", "터미널구분",
+        "보관료_T1", "보관료_T2", "보관료_T3", "보관료_T4", "보관료_T5", "보관료_T6",
+        "상하차료_T1", "상하차료_T2", "상하차료_T3", "상하차료_T4", "상하차료_T5", "상하차료_T6",
+        "셔틀비_T1", "셔틀비_T2", "셔틀비_T3", "셔틀비_T4", "셔틀비_T5", "셔틀비_T6",
+        "비고",
+    ], [18, 18] + [11]*18 + [25])
     for sr in storage_rates:
         ws_sr.append([
-            sr.get("odcy_name", ""), sr.get("zone_type", ""),
-            sr.get("storage_unit"), sr.get("handling_unit"), sr.get("memo", ""),
+            sr.get("odcy_name", ""), sr.get("terminal_type", ""),
+            sr.get("storage_tier1"), sr.get("storage_tier2"), sr.get("storage_tier3"),
+            sr.get("storage_tier4"), sr.get("storage_tier5"), sr.get("storage_tier6"),
+            sr.get("handling_tier1"), sr.get("handling_tier2"), sr.get("handling_tier3"),
+            sr.get("handling_tier4"), sr.get("handling_tier5"), sr.get("handling_tier6"),
+            sr.get("shuttle_tier1"), sr.get("shuttle_tier2"), sr.get("shuttle_tier3"),
+            sr.get("shuttle_tier4"), sr.get("shuttle_tier5"), sr.get("shuttle_tier6"),
+            sr.get("memo", ""),
         ])
     if not storage_rates:
-        ws_sr.append(["세방(주)", "배후단지", 10000, 8000, "예시 (등록 후 삭제)"])
+        ws_sr.append(["세방(주)", "배후단지",
+                      10000, 11000, 12000, None, None, None,
+                      8000,  9000,  10000, None, None, None,
+                      5000,  6000,  7000,  None, None, None,
+                      "예시 (등록 후 삭제)"])
 
     buf = BytesIO()
     wb.save(buf)
@@ -320,11 +338,12 @@ def _process_upload(wb):
         if has_data and "엑셀 원본명" in col_map and "포트 구분" in col_map:
             data_store.save("port_mappings.json", [])
             success, failed, new_items, next_id = 0, [], [], 1
-            zone_col = col_map.get("단지구분")
+            # "터미널구분" 우선, 없으면 구버전 "단지구분" fallback
+            term_col = col_map.get("터미널구분") if "터미널구분" in col_map else col_map.get("단지구분")
             for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
-                excel_name = row[col_map["엑셀 원본명"]].value
-                port_type  = row[col_map["포트 구분"]].value
-                zone_type  = row[zone_col].value if zone_col is not None else None
+                excel_name    = row[col_map["엑셀 원본명"]].value
+                port_type     = row[col_map["포트 구분"]].value
+                terminal_type = row[term_col].value if term_col is not None else None
                 if not excel_name and not port_type:
                     continue
                 if not excel_name or not port_type:
@@ -332,9 +351,9 @@ def _process_upload(wb):
                     continue
                 new_items.append({
                     "id": next_id,
-                    "excel_name": str(excel_name).strip(),
-                    "port_type": str(port_type).strip(),
-                    "zone_type": str(zone_type).strip() if zone_type else "",
+                    "excel_name":    str(excel_name).strip(),
+                    "port_type":     str(port_type).strip(),
+                    "terminal_type": str(terminal_type).strip() if terminal_type else "",
                 })
                 next_id += 1; success += 1
             data_store.save("port_mappings.json", new_items)
@@ -378,12 +397,14 @@ def _process_upload(wb):
         )
         dest_col = col_map.get("ODCY 도착지명 (엑셀 원본명)") if "ODCY 도착지명 (엑셀 원본명)" in col_map else col_map.get("ODCY 도착지명")
         name_col = col_map.get("ODCY명")
+        term_col_om = col_map.get("터미널구분")
         if has_data and dest_col is not None and name_col is not None:
             data_store.save("odcy_mappings.json", [])
             success, failed, new_items, next_id = 0, [], [], 1
             for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
-                odcy_dest = row[dest_col].value
-                odcy_name = row[name_col].value
+                odcy_dest     = row[dest_col].value
+                odcy_name     = row[name_col].value
+                terminal_type = row[term_col_om].value if term_col_om is not None else None
                 if not odcy_dest and not odcy_name:
                     continue
                 if not odcy_dest or not odcy_name:
@@ -393,6 +414,7 @@ def _process_upload(wb):
                     "id": next_id,
                     "odcy_destination_name": str(odcy_dest).strip(),
                     "odcy_name": str(odcy_name).strip(),
+                    "terminal_type": str(terminal_type).strip() if terminal_type else "",
                 })
                 next_id += 1; success += 1
             data_store.save("odcy_mappings.json", new_items)
@@ -444,9 +466,9 @@ def _process_upload(wb):
             data_store.save("trkv_routes.json", new_routes)
             result["TRKV 구간 요율"] = {"success": success, "failed": failed}
 
-    # ── 보관료_상하차료 요율 시트 ─────────────────────────────────────
+    # ── 보관료_상하차료_셔틀비 요율 시트 ─────────────────────────────
     for sheet_name in wb.sheetnames:
-        if "보관료" in sheet_name or "상하차" in sheet_name:
+        if "보관료" in sheet_name or "상하차" in sheet_name or "셔틀" in sheet_name:
             ws = wb[sheet_name]
             header  = [cell.value for cell in ws[1]]
             col_map = {str(v).strip(): i for i, v in enumerate(header) if v is not None}
@@ -454,34 +476,44 @@ def _process_upload(wb):
                 any(c.value is not None for c in row)
                 for row in ws.iter_rows(min_row=2, max_row=ws.max_row or 1)
             )
-            if has_data and ("보관료 단가" in col_map or "상하차료 단가" in col_map):
+            # 신규 티어 컬럼 또는 구버전 단가 컬럼 모두 허용
+            tier_keys = [k for k in col_map if "_T" in k or "보관료 단가" in k or "상하차료 단가" in k]
+            if has_data and tier_keys:
                 data_store.save("storage_rates.json", [])
-                odcy_col     = col_map.get("ODCY명")
-                zone_col     = col_map.get("단지구분")
-                storage_col  = col_map.get("보관료 단가")
-                handling_col = col_map.get("상하차료 단가")
-                memo_col     = col_map.get("비고")
+                odcy_col  = col_map.get("ODCY명")
+                term_col2 = col_map.get("터미널구분") if "터미널구분" in col_map else col_map.get("단지구분")
+                memo_col  = col_map.get("비고")
                 success, failed, new_items, next_id = 0, [], [], 1
                 for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
-                    def _gv(col_idx, _row=row):
+                    def _gv2(col_idx, _row=row):
                         return _row[col_idx].value if col_idx is not None else None
-                    odcy_name    = str(_gv(odcy_col) or "").strip()
-                    zone_type    = str(_gv(zone_col) or "").strip()
-                    storage_unit = to_float(_gv(storage_col))
-                    handling_unit= to_float(_gv(handling_col))
-                    if not odcy_name and not zone_type and storage_unit is None and handling_unit is None:
+                    odcy_name     = str(_gv2(odcy_col) or "").strip()
+                    terminal_type = str(_gv2(term_col2) or "").strip()
+                    # 티어 컬럼 수집
+                    sr_cols = {"보관료_T": "storage_tier", "상하차료_T": "handling_tier", "셔틀비_T": "shuttle_tier"}
+                    obj = {"id": next_id, "odcy_name": odcy_name, "terminal_type": terminal_type,
+                           "memo": str(_gv2(memo_col) or "").strip()}
+                    all_none = True
+                    for prefix, key in sr_cols.items():
+                        for t in range(1, 7):
+                            col_key = f"{prefix}{t}"
+                            val = to_float(_gv2(col_map.get(col_key)))
+                            obj[f"{key}{t}"] = val
+                            if val is not None:
+                                all_none = False
+                    # 구버전 단가 컬럼 fallback
+                    if "보관료 단가" in col_map:
+                        v = to_float(_gv2(col_map["보관료 단가"]))
+                        obj["storage_tier1"] = v; all_none = all_none and (v is None)
+                    if "상하차료 단가" in col_map:
+                        v = to_float(_gv2(col_map["상하차료 단가"]))
+                        obj["handling_tier1"] = v; all_none = all_none and (v is None)
+                    if not odcy_name and not terminal_type and all_none:
                         continue
-                    new_items.append({
-                        "id": next_id,
-                        "odcy_name": odcy_name,
-                        "zone_type": zone_type,
-                        "storage_unit": storage_unit,
-                        "handling_unit": handling_unit,
-                        "memo": str(_gv(memo_col) or "").strip(),
-                    })
+                    new_items.append(obj)
                     next_id += 1; success += 1
                 data_store.save("storage_rates.json", new_items)
-                result["보관료_상하차료 요율"] = {"success": success, "failed": failed}
+                result["보관료_상하차료_셔틀비 요율"] = {"success": success, "failed": failed}
             break  # 시트 하나만 처리
 
     if not result:
