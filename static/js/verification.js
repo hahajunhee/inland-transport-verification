@@ -223,6 +223,12 @@ function renderRow(r) {
 
   const storageDays = r.storage_days != null ? r.storage_days : "-";
 
+  // 날짜: 년-월-일만 표시 (시간 제거)
+  const fmtDateOnly = (v) => {
+    if (!v) return "-";
+    return String(v).slice(0, 10);
+  };
+
   return `<tr class="${rowClass}">
     <td>${r.row_number}</td>
     <td>${r.container_no || "-"}</td>
@@ -242,18 +248,18 @@ function renderRow(r) {
     <!-- TRKV (5열: 단가 + 청구 + 예상 + 차이 + 상태) -->
     <td class="money trkv-unit">${unitRate}</td>
     ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status)}
-    <!-- 구분값 정보 (6열) -->
+    <!-- 구분값 정보 (9열) -->
     <td class="td-info">${r.odcy_destination_name || "-"}</td>
     <td class="td-info">${r.dest_name || "-"}</td>
     <td class="td-info">${r.odcy_terminal_type || "-"}</td>
     <td class="td-info">${r.odcy_location || "-"}</td>
     <td class="td-info">${r.dest_port_type || "-"}</td>
     <td class="td-info">${r.dest_terminal_type || "-"}</td>
-    <!-- 보관료 (8열: 티어 + 반입일 + 반출일 + 일수 + 청구 + 예상 + 차이 + 상태) -->
+    <td class="td-info" style="font-size:11px">${fmtDateOnly(r.odcy_in_date)}</td>
+    <td class="td-info" style="font-size:11px">${fmtDateOnly(r.odcy_out_date)}</td>
+    <td class="td-info td-center">${storageDays}</td>
+    <!-- 보관료 (5열: 티어 + 청구 + 예상 + 차이 + 상태) -->
     <td class="td-tier">${storageTierBadge}</td>
-    <td style="font-size:11px">${r.odcy_in_date || "-"}</td>
-    <td style="font-size:11px">${r.odcy_out_date || "-"}</td>
-    <td class="td-center">${storageDays}</td>
     ${chargeCell(r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status)}
     <!-- 상하차료 -->
     ${chargeCell(r.handling_actual, r.handling_expected, r.handling_diff, r.handling_status)}

@@ -193,9 +193,9 @@ def generate_results_excel(results: list) -> bytes:
         "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
         # 구분값 정보 (TRKV상태 우측)
         "ODCY도착지명", "도착지명(원본)", "odcy터미널구분", "ODCY_위치", "도착지포트구분", "도착지터미널구분",
+        "ODCY반입일", "ODCY반출일", "보관일수",
         # 보관료
-        "보관료티어", "ODCY반입일", "ODCY반출일", "보관일수",
-        "보관료청구금액", "보관료예상금액", "보관료차이금액", "보관료상태",
+        "보관료티어", "보관료청구금액", "보관료예상금액", "보관료차이금액", "보관료상태",
         # 상하차료
         "상하차료청구금액", "상하차료예상금액", "상하차료차이금액", "상하차료상태",
         # 셔틀비용
@@ -225,9 +225,9 @@ def generate_results_excel(results: list) -> bytes:
             # 구분값 정보
             g("odcy_destination_name"), g("dest_name"),
             g("odcy_terminal_type"), g("odcy_location"), g("dest_port_type"), g("dest_terminal_type"),
+            g("odcy_in_date"), g("odcy_out_date"), g("storage_days"),
             # 보관료
-            g("storage_tier_number"), g("odcy_in_date"), g("odcy_out_date"), g("storage_days"),
-            g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
+            g("storage_tier_number"), g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
             g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),
             g("shuttle_actual"), g("shuttle_expected"), g("shuttle_diff"), g("shuttle_status"),
             g("overall_status"),
