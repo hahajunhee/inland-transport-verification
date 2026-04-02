@@ -167,18 +167,40 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
 
 # ─── 결과 엑셀 생성 ───────────────────────────────────────────
 
-FILL_OK = PatternFill("solid", fgColor="C6EFCE")
-FILL_DIFF = PatternFill("solid", fgColor="FFC7CE")
-FILL_NO_RATE = PatternFill("solid", fgColor="FFEB9C")
-FILL_SKIP = PatternFill("solid", fgColor="F2F2F2")
-FILL_HEADER = PatternFill("solid", fgColor="1a73e8")
+# 행 상태별 색상 (웹 CSS와 동일)
+FILL_OK      = PatternFill("solid", fgColor="FFFFFF")  # OK: 흰색 (웹과 동일)
+FILL_DIFF    = PatternFill("solid", fgColor="FFF5F5")  # DIFF: #fff5f5
+FILL_NO_RATE = PatternFill("solid", fgColor="FFFEF0")  # NO_RATE: #fffef0
+FILL_SKIP    = PatternFill("solid", fgColor="F2F2F2")  # SKIP: 회색
 
 STATUS_FILL = {
-    "OK": FILL_OK,
-    "DIFF": FILL_DIFF,
+    "OK":      FILL_OK,
+    "DIFF":    FILL_DIFF,
     "NO_RATE": FILL_NO_RATE,
-    "SKIP": FILL_SKIP,
+    "SKIP":    FILL_SKIP,
 }
+
+# 섹션별 색상 (웹 CSS와 동일)
+# 그룹 헤더 행 (Row 1): 진한 색
+# 컬럼 헤더 행 (Row 2): 연한 색 (웹 th-xxx 배경색)
+_SECTIONS = [
+    # (start_col, end_col, label, group_bg, col_bg, col_font)
+    (1,   3,  "기본 정보",      "374151", "E5E7EB", "374151"),
+    (4,   14, "운송 구간 정보", "0F766E", "CCFBF1", "0F766E"),
+    (15,  19, "TRKV",           "1A73E8", "E8F0FE", "1A73E8"),
+    (20,  28, "구분값 정보",    "6B21A8", "F3E8FF", "6B21A8"),
+    (29,  33, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
+    (34,  37, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
+    (38,  41, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
+    (42,  42, "종합",           "374151", "E5E7EB", "374151"),
+]
+
+def _col_style(col_idx: int):
+    """컬럼 인덱스(1-based)에 따른 (col_bg, col_font) 반환."""
+    for start, end, _, _, col_bg, col_font in _SECTIONS:
+        if start <= col_idx <= end:
+            return col_bg, col_font
+    return "FFFFFF", "000000"
 
 
 def generate_results_excel(results: list) -> bytes:
@@ -191,7 +213,7 @@ def generate_results_excel(results: list) -> bytes:
         "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호",
         # TRKV
         "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
-        # 구분값 정보 (TRKV상태 우측)
+        # 구분값 정보
         "ODCY도착지명", "도착지명(원본)", "odcy터미널구분", "ODCY_위치", "도착지포트구분", "도착지터미널구분",
         "ODCY반입일", "ODCY반출일", "보관일수",
         # 보관료
@@ -202,18 +224,32 @@ def generate_results_excel(results: list) -> bytes:
         "셔틀료청구금액", "셔틀료예상금액", "셔틀료차이금액", "셔틀료상태",
         "종합상태",
     ]
+    total_cols = len(headers)
 
-    # 헤더 행
+    # ── Row 1: 섹션 그룹 헤더 (병합 + 진한 배경) ──────────────────
+    ws.append([""] * total_cols)
+    for start, end, label, group_bg, _, _ in _SECTIONS:
+        cell = ws.cell(row=1, column=start, value=label)
+        cell.fill = PatternFill("solid", fgColor=group_bg)
+        cell.font = Font(bold=True, color="FFFFFF", size=10)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        if end > start:
+            ws.merge_cells(start_row=1, start_column=start,
+                           end_row=1, end_column=end)
+    ws.row_dimensions[1].height = 20
+
+    # ── Row 2: 개별 컬럼 헤더 (섹션 배경색) ──────────────────────
     ws.append(headers)
-    for cell in ws[1]:
-        cell.fill = FILL_HEADER
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.alignment = Alignment(horizontal="center")
+    for col_idx, cell in enumerate(ws[2], 1):
+        col_bg, col_font = _col_style(col_idx)
+        cell.fill = PatternFill("solid", fgColor=col_bg)
+        cell.font = Font(bold=True, color=col_font, size=9)
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.row_dimensions[2].height = 28
 
     money_cols = {headers.index(h) + 1 for h in headers if "금액" in h}
 
     for r in results:
-        # dict 또는 ORM 객체 모두 지원
         g = (lambda k: r.get(k) if isinstance(r, dict) else getattr(r, k, None))
         row_data = [
             g("row_number"), g("container_no"), g("transport_date"),
@@ -235,18 +271,23 @@ def generate_results_excel(results: list) -> bytes:
         ws.append(row_data)
         excel_row = ws.max_row
 
-        # 행 색상 (overall_status 기준)
-        fill = STATUS_FILL.get(g("overall_status") or "", FILL_SKIP)
-        for col_idx in range(1, len(headers) + 1):
+        # 행 색상 (overall_status 기준, 웹과 동일)
+        row_fill = STATUS_FILL.get(g("overall_status") or "", FILL_SKIP)
+        for col_idx in range(1, total_cols + 1):
             cell = ws.cell(row=excel_row, column=col_idx)
-            cell.fill = fill
+            cell.fill = row_fill
+            cell.font = Font(size=9)
+            cell.alignment = Alignment(vertical="center")
             if col_idx in money_cols and cell.value is not None:
                 cell.number_format = '#,##0'
 
-    # 컬럼 너비 자동 조정
+    # ── 컬럼 너비 자동 조정 (헤더 행 기준 포함) ───────────────────
     for col_idx, col_cells in enumerate(ws.columns, 1):
         max_len = max((len(str(c.value or "")) for c in col_cells), default=8)
         ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, 30)
+
+    # 행 고정 (헤더 2행 고정)
+    ws.freeze_panes = "A3"
 
     buf = BytesIO()
     wb.save(buf)
