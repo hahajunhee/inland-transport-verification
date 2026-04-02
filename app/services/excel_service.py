@@ -247,6 +247,37 @@ def generate_results_excel(results: list) -> bytes:
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws.row_dimensions[2].height = 28
 
+    # ── Row 3: 출처 정보 행 ────────────────────────────────────────
+    sources = [
+        # 기본 정보 (1-3)
+        "생성", "검증: Contrainer No.", "검증: 출하일",
+        # 운송 구간 정보 (4-14)
+        "검증: 픽업지명", "요율표: PM-A", "검증: 출하지명", "요율표: DM-A",
+        "검증: 상세ODCY", "검증: 도착지명", "요율표: PM-A",
+        "검증: Cont.Category", "검증: Quantity", "검증: Weekend/Holiday", "요율표: 컨테이너티어",
+        # TRKV (15-19)
+        "요율표: TRKV구간", "검증: Mobis운임합계", "계산", "계산", "계산",
+        # 구분값 정보 (20-28)
+        "검증: ODCY도착지명", "검증: 도착지명",
+        "요율표: OM-C", "요율표: OM-D", "요율표: PM-B", "요율표: PM-C",
+        "검증: ODCY 반입일", "검증: ODCY 반출일", "계산",
+        # 보관료 (29-33)
+        "요율표: 보관료", "검증: ODCY 보관료", "계산", "계산", "계산",
+        # 상하차료 (34-37)
+        "검증: ODCY 상하차료", "계산", "계산", "계산",
+        # 셔틀비용 (38-41)
+        "검증: ODCY 셔틀료", "계산", "계산", "계산",
+        # 종합 (42)
+        "계산",
+    ]
+    ws.append(sources)
+    for col_idx, cell in enumerate(ws[3], 1):
+        col_bg, col_font = _col_style(col_idx)
+        cell.fill = PatternFill("solid", fgColor=col_bg)
+        cell.font = Font(size=8, color=col_font, italic=True)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[3].height = 16
+
     money_cols = {headers.index(h) + 1 for h in headers if "금액" in h}
 
     for r in results:
@@ -287,7 +318,7 @@ def generate_results_excel(results: list) -> bytes:
         ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, 30)
 
     # 행 고정 (헤더 2행 고정)
-    ws.freeze_panes = "A3"
+    ws.freeze_panes = "A4"
 
     buf = BytesIO()
     wb.save(buf)

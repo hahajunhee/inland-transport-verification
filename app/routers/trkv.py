@@ -304,18 +304,55 @@ def download_unified_template():
         ws_rt.append(["부산신항", "AS", "부산북항", 100000, 110000, 120000, 130000, 140000, 150000, "예시 (등록 후 삭제)"])
 
     # ── Sheet 5: 보관료_상하차료_셔틀비 요율 ──────────────────────────
-    # A열: ODCY도착지명(엑셀원본명) [OM-A]  ← ODCY 매핑의 원본명
-    # B열: 포트명(엑셀원본명) [PM-A]         ← 포트명 매핑의 원본명
-    # 두 매핑의 모든 조합을 미리 생성하고 기존 요율이 있으면 채워 넣음
+    # A~D: OM 매핑 정보 (호박색), E~G: PM 매핑 정보 (파란색)
     ws_sr = wb.create_sheet("보관료_상하차료_셔틀비 요율")
+
+    OM_FILL  = PatternFill("solid", fgColor="FFF3CD")
+    OM_FONT  = Font(bold=True, color="856404")
+    PM_FILL  = PatternFill("solid", fgColor="D0EFFF")
+    PM_FONT  = Font(bold=True, color="0369A1")
+    TIER_HDR = PatternFill("solid", fgColor="4472C4")
+    TIER_FNT = Font(bold=True, color="FFFFFF")
+
     sr_headers = [
-        "ODCY도착지명(엑셀원본명) [OM-A]", "포트명(엑셀원본명) [PM-A]",
+        "ODCY도착지명(엑셀원본명) [OM-A]",  # A
+        "ODCY명 [OM-B]",                     # B
+        "odcy터미널구분 [OM-C]",             # C
+        "ODCY_위치 [OM-D]",                  # D
+        "포트명(엑셀원본명) [PM-A]",         # E
+        "포트 구분 [PM-B]",                  # F
+        "터미널구분 [PM-C]",                 # G
         "보관료_T1", "보관료_T2", "보관료_T3", "보관료_T4", "보관료_T5", "보관료_T6",
         "상하차료_T1", "상하차료_T2", "상하차료_T3", "상하차료_T4", "상하차료_T5", "상하차료_T6",
         "셔틀비_T1", "셔틀비_T2", "셔틀비_T3", "셔틀비_T4", "셔틀비_T5", "셔틀비_T6",
         "비고",
     ]
-    _style_header(ws_sr, sr_headers, [38, 34] + [11] * 18 + [25])
+    col_widths_sr = [36, 20, 20, 20, 32, 16, 16] + [11]*18 + [25]
+
+    # 그룹 레이블 행 (Row 1)
+    ws_sr.append(["OM 매핑 정보"] + [""]*3 + ["PM 매핑 정보"] + [""]*2 + ["보관료 요율 (T1~T6)"] + [""]*5 + ["상하차료 요율 (T1~T6)"] + [""]*5 + ["셔틀비 요율 (T1~T6)"] + [""]*5 + ["비고"])
+    label_fills = [(1,4,"FFF3CD","856404"), (5,7,"D0EFFF","0369A1"), (8,13,"E6F9F0","1E7E34"), (14,19,"FEF3E8","D96C00"), (20,25,"F3E8FE","7B1FA2"), (26,26,"F5F5F5","374151")]
+    for start, end, bg, fg in label_fills:
+        cell = ws_sr.cell(row=1, column=start)
+        cell.fill = PatternFill("solid", fgColor=bg)
+        cell.font = Font(bold=True, color=fg)
+        cell.alignment = Alignment(horizontal="center")
+        if end > start:
+            ws_sr.merge_cells(start_row=1, start_column=start, end_row=1, end_column=end)
+
+    # 헤더 행 (Row 2)
+    ws_sr.append(sr_headers)
+    for i, cell in enumerate(ws_sr[2], 1):
+        if i <= 4:
+            cell.fill = OM_FILL; cell.font = OM_FONT
+        elif i <= 7:
+            cell.fill = PM_FILL; cell.font = PM_FONT
+        else:
+            cell.fill = TIER_HDR; cell.font = TIER_FNT
+        cell.alignment = Alignment(horizontal="center")
+
+    for i, w in enumerate(col_widths_sr, 1):
+        ws_sr.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
 
     # 기존 요율 룩업: (odcy_name, odcy_terminal_type, odcy_location, dest_port_type, dest_terminal_type) → rate
     sr_lookup: dict = {}
@@ -327,7 +364,6 @@ def download_unified_template():
         )
         sr_lookup[key] = sr
 
-    # ODCY 매핑 / 포트명 매핑 룩업
     odcy_by_dest = {m["odcy_destination_name"]: m for m in odcy_mappings}
     port_by_excel = {m["excel_name"]: m for m in port_mappings}
 
@@ -337,7 +373,6 @@ def download_unified_template():
             odcy_dest = om["odcy_destination_name"]
             for pm in port_mappings:
                 port_excel = pm["excel_name"]
-                # 5키로 기존 요율 조회
                 key = (
                     om.get("odcy_name", ""), om.get("odcy_terminal_type", ""),
                     om.get("odcy_location", ""), pm.get("port_type", ""),
@@ -345,7 +380,13 @@ def download_unified_template():
                 )
                 sr = sr_lookup.get(key, {})
                 ws_sr.append([
-                    odcy_dest, port_excel,
+                    odcy_dest,
+                    om.get("odcy_name", ""),
+                    om.get("odcy_terminal_type", ""),
+                    om.get("odcy_location", ""),
+                    port_excel,
+                    pm.get("port_type", ""),
+                    pm.get("terminal_type", ""),
                     sr.get("storage_tier1"), sr.get("storage_tier2"), sr.get("storage_tier3"),
                     sr.get("storage_tier4"), sr.get("storage_tier5"), sr.get("storage_tier6"),
                     sr.get("handling_tier1"), sr.get("handling_tier2"), sr.get("handling_tier3"),
@@ -357,8 +398,7 @@ def download_unified_template():
                 rows_written += 1
 
     if rows_written == 0:
-        # 매핑 데이터 없을 때 예시 행
-        ws_sr.append(["SB청암", "부산신항BPTS",
+        ws_sr.append(["SB청암", "세방(주)", "배후단지", "부산신항", "부산신항BPTS", "부산신항", "",
                       10000, 11000, 12000, None, None, None,
                       8000,  9000,  10000, None, None, None,
                       5000,  6000,  7000,  None, None, None,
@@ -559,10 +599,20 @@ def _process_upload(wb):
     for sheet_name in wb.sheetnames:
         if "보관료" in sheet_name or "상하차" in sheet_name or "셔틀" in sheet_name:
             ws = wb[sheet_name]
-            header  = [cell.value for cell in ws[1]]
+            # 새 형식(Row1=그룹레이블, Row2=헤더) / 구 형식(Row1=헤더) 자동 감지
+            row1_vals = [cell.value for cell in ws[1]]
+            row2_vals = [cell.value for cell in ws[2]] if ws.max_row >= 2 else []
+            # Row2에 "_T" 패턴 헤더가 있으면 새 형식 (2행 헤더 구조)
+            row2_has_tier = any(v and "_T" in str(v) for v in row2_vals)
+            if row2_has_tier:
+                header = row2_vals
+                data_start_row = 3
+            else:
+                header = row1_vals
+                data_start_row = 2
             col_map = {str(v).strip(): i for i, v in enumerate(header) if v is not None}
             tier_keys = [k for k in col_map if "_T" in k or "보관료 단가" in k or "상하차료 단가" in k]
-            if not (has_data(ws) and tier_keys):
+            if not tier_keys:
                 break
 
             data_store.save("storage_rates.json", [])
@@ -598,7 +648,7 @@ def _process_upload(wb):
             memo_col = _find_col(col_map, "비고")
 
             success, failed, new_items, next_id = 0, [], [], 1
-            for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
+            for i, row in enumerate(ws.iter_rows(min_row=data_start_row), start=data_start_row):
                 def _gv2(col_idx, _row=row):
                     return _row[col_idx].value if col_idx is not None else None
 

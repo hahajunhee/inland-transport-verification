@@ -108,16 +108,16 @@
         <thead>
           <!-- 1행: 그룹 헤더 -->
           <tr>
-            <th rowspan="2" class="sortable-th" onclick="sortBy('row_number')">행# <span class="sort-arrow">↕</span></th>
-            <th rowspan="2" class="sortable-th" onclick="sortBy('container_no')">컨테이너번호 <span class="sort-arrow">↕</span></th>
-            <th rowspan="2" class="sortable-th" onclick="sortBy('transport_date')">운송일자 <span class="sort-arrow">↕</span></th>
+            <th rowspan="3" class="sortable-th" onclick="sortBy('row_number')">행# <span class="sort-arrow">↕</span></th>
+            <th rowspan="3" class="sortable-th" onclick="sortBy('container_no')">컨테이너번호 <span class="sort-arrow">↕</span></th>
+            <th rowspan="3" class="sortable-th" onclick="sortBy('transport_date')">운송일자 <span class="sort-arrow">↕</span></th>
             <th colspan="11" class="th-group th-route">운송 구간 정보</th>
             <th colspan="5" class="th-group th-trkv">TRKV</th>
             <th colspan="9" class="th-group th-info">구분값 정보</th>
             <th colspan="5" class="th-group th-storage">보관료</th>
             <th colspan="4" class="th-group th-handling">상하차료</th>
             <th colspan="4" class="th-group th-shuttle">셔틀비용</th>
-            <th rowspan="2" class="sortable-th" onclick="sortBy('overall_status')">종합 <span class="sort-arrow">↕</span></th>
+            <th rowspan="3" class="sortable-th" onclick="sortBy('overall_status')">종합 <span class="sort-arrow">↕</span></th>
           </tr>
           <!-- 2행: 세부 헤더 -->
           <tr>
@@ -140,12 +140,12 @@
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_diff')">차이 <span class="sort-arrow">↕</span></th>
             <th class="th-trkv sortable-th" onclick="sortBy('trkv_status')">상태 <span class="sort-arrow">↕</span></th>
             <!-- 구분값 정보 9열 -->
-            <th class="th-info">ODCY도착지명</th>
+            <th class="th-info">ODCY도착지명<br><small class="code-tag">[OM-A]</small></th>
             <th class="th-info">도착지명</th>
-            <th class="th-info">odcy터미널구분</th>
-            <th class="th-info">ODCY_위치</th>
-            <th class="th-info">도착지포트구분</th>
-            <th class="th-info">도착지터미널구분</th>
+            <th class="th-info">odcy터미널구분<br><small class="code-tag">[OM-C]</small></th>
+            <th class="th-info">ODCY_위치<br><small class="code-tag">[OM-D]</small></th>
+            <th class="th-info">도착지포트구분<br><small class="code-tag">[PM-B]</small></th>
+            <th class="th-info">도착지터미널구분<br><small class="code-tag">[PM-C]</small></th>
             <th class="th-info sortable-th" onclick="sortBy('odcy_in_date')">반입일 <span class="sort-arrow">↕</span></th>
             <th class="th-info sortable-th" onclick="sortBy('odcy_out_date')">반출일 <span class="sort-arrow">↕</span></th>
             <th class="th-info sortable-th" onclick="sortBy('storage_days')">보관일수 <span class="sort-arrow">↕</span></th>
@@ -159,6 +159,53 @@
             <!-- 셔틀비용 4열 -->
             <th class="th-shuttle">청구</th><th class="th-shuttle">예상</th><th class="th-shuttle">차이</th>
             <th class="th-shuttle sortable-th" onclick="sortBy('shuttle_status')">상태 <span class="sort-arrow">↕</span></th>
+          </tr>
+          <!-- 3행: 출처 정보 -->
+          <tr class="th-source-row">
+            <!-- 운송 구간 정보 11열 -->
+            <th class="th-source th-route">검증: 픽업지명</th>
+            <th class="th-source th-route">요율표: PM-A</th>
+            <th class="th-source th-route">검증: 출하지명</th>
+            <th class="th-source th-route">요율표: DM-A</th>
+            <th class="th-source th-route">검증: 상세ODCY</th>
+            <th class="th-source th-route">검증: 도착지명</th>
+            <th class="th-source th-route">요율표: PM-A</th>
+            <th class="th-source th-route">검증: Cont.Category</th>
+            <th class="th-source th-route">검증: Quantity</th>
+            <th class="th-source th-route">검증: Weekend/Holiday</th>
+            <th class="th-source th-route">요율표: 컨테이너티어</th>
+            <!-- TRKV 5열 -->
+            <th class="th-source th-trkv">요율표: TRKV구간</th>
+            <th class="th-source th-trkv">검증: Mobis운임합계</th>
+            <th class="th-source th-trkv">계산</th>
+            <th class="th-source th-trkv">계산</th>
+            <th class="th-source th-trkv">계산</th>
+            <!-- 구분값 정보 9열 -->
+            <th class="th-source th-info">검증: ODCY도착지명</th>
+            <th class="th-source th-info">검증: 도착지명</th>
+            <th class="th-source th-info">요율표: OM-C</th>
+            <th class="th-source th-info">요율표: OM-D</th>
+            <th class="th-source th-info">요율표: PM-B</th>
+            <th class="th-source th-info">요율표: PM-C</th>
+            <th class="th-source th-info">검증: ODCY 반입일</th>
+            <th class="th-source th-info">검증: ODCY 반출일</th>
+            <th class="th-source th-info">계산</th>
+            <!-- 보관료 5열 -->
+            <th class="th-source th-storage">요율표: 보관료</th>
+            <th class="th-source th-storage">검증: ODCY보관료</th>
+            <th class="th-source th-storage">계산</th>
+            <th class="th-source th-storage">계산</th>
+            <th class="th-source th-storage">계산</th>
+            <!-- 상하차료 4열 -->
+            <th class="th-source th-handling">검증: ODCY상하차료</th>
+            <th class="th-source th-handling">계산</th>
+            <th class="th-source th-handling">계산</th>
+            <th class="th-source th-handling">계산</th>
+            <!-- 셔틀비용 4열 -->
+            <th class="th-source th-shuttle">검증: ODCY셔틀료</th>
+            <th class="th-source th-shuttle">계산</th>
+            <th class="th-source th-shuttle">계산</th>
+            <th class="th-source th-shuttle">계산</th>
           </tr>
         </thead>
         <tbody id="results-tbody">
@@ -200,6 +247,9 @@
   font-size: 12px;
 }
 .th-info { background: #f3e8ff !important; color: #6b21a8; font-size: 11px; }
+.th-source-row th { font-size: 9px !important; font-weight: 400 !important; opacity: 0.75; padding: 2px 4px !important; }
+.th-source { font-size: 9px !important; }
+.code-tag { font-size: 9px; font-weight: 700; letter-spacing: 0; opacity: 0.85; }
 </style>
 {% endblock %}
 

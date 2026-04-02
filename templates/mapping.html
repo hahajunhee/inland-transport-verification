@@ -4,10 +4,10 @@
 {% block content %}
 <div class="page-header">
   <h1 class="page-title">매핑설정</h1>
-  <p class="page-desc">포트명·출하지명을 내부 코드로 매핑합니다. TRKV 요율 조회에 사용됩니다.</p>
+  <p class="page-desc">포트명·출하지명을 내부 코드로 매핑합니다.</p>
 </div>
 
-<!-- ───────────── 통합 업로드 (전체 교체) ───────────── -->
+<!-- 통합 업로드 -->
 <div class="card unified-upload-card">
   <div class="unified-upload-row">
     <span class="unified-upload-label">통합 양식 (전체 교체)</span>
@@ -20,50 +20,31 @@
   </div>
 </div>
 
-<!-- ───────────── 포트명 매핑 ───────────── -->
+<!-- ① 포트명 매핑 -->
 <div class="card">
-  <h2 class="card-title">① 포트명 매핑</h2>
-  <p class="card-desc">엑셀의 픽업지명·도착지명 → 포트구분값으로 변환합니다. (TRKV 픽업항·도착항 기준)</p>
-
-  <form id="pm-form" class="inline-form">
-    <input type="hidden" id="pm-edit-id" value="" />
-    <div class="form-row">
-      <div class="form-group">
-        <label>엑셀 원본 명칭 <span class="required">*</span></label>
-        <input type="text" id="pm-excel-name" placeholder="예: 부산신항터미널, 북컨배후단지" required />
-      </div>
-      <div class="form-group">
-        <label>포트 구분 <span class="required">*</span></label>
-        <input type="text" id="pm-port-type" placeholder="예: 부산신항, 부산북항" required />
-      </div>
-      <div class="form-group">
-        <label>터미널구분 <span style="color:#6b7280;font-size:12px">(선택)</span></label>
-        <input type="text" id="pm-terminal-type" placeholder="예: 신선대, 감만" />
-      </div>
-      <div class="form-group form-group-btn">
-        <label>&nbsp;</label>
-        <div class="btn-row">
-          <button type="submit" class="btn btn-primary" id="pm-submit-btn">추가</button>
-          <button type="button" class="btn btn-outline" id="pm-cancel-btn" style="display:none" onclick="cancelPmEdit()">취소</button>
-        </div>
-      </div>
+  <div class="card-header-row">
+    <h2 class="card-title">① 포트명 매핑</h2>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button type="button" class="btn btn-sm btn-outline" id="pm-bulk-btn" onclick="togglePmBulkEdit()">일괄 편집</button>
+      <button type="button" class="btn btn-sm btn-primary" onclick="showPmAddRow()">+ 추가</button>
     </div>
-  </form>
+  </div>
   <div id="pm-msg" class="form-msg" style="display:none"></div>
-
-  <div class="table-wrapper" style="margin-top:12px">
+  <div class="table-wrapper" style="margin-top:8px">
     <table class="data-table">
       <thead>
         <tr>
           <th><input type="checkbox" id="pm-check-all" onchange="toggleAllPmCheck(this.checked)" /></th>
-          <th>#</th><th>엑셀 원본 명칭</th><th>포트 구분</th><th>터미널구분</th><th>관리</th>
+          <th>#</th>
+          <th>포트명(엑셀원본명) <span class="code-badge pm-badge">PM-A</span></th>
+          <th>포트 구분 <span class="code-badge pm-badge">PM-B</span></th>
+          <th>터미널구분 <span class="code-badge pm-badge">PM-C</span></th>
+          <th>관리</th>
         </tr>
       </thead>
       <tbody id="pm-tbody">
         <tr><td colspan="6" class="empty-msg">불러오는 중...</td></tr>
       </tbody>
-      <!-- row-changed highlight -->
-      <style>.row-changed td { background-color:#fef9c3 !important; }</style>
     </table>
   </div>
   <div class="table-action-bar" id="pm-action-bar" style="display:none;margin-top:8px">
@@ -73,39 +54,25 @@
   </div>
 </div>
 
-<!-- ───────────── 출하지 매핑 ───────────── -->
+<!-- ② 출하지 매핑 -->
 <div class="card">
-  <h2 class="card-title">② 출하지 매핑</h2>
-  <p class="card-desc">엑셀의 출하지명 → 출하지코드로 변환합니다. (TRKV 구간요율 조회 기준)</p>
-
-  <form id="dm-form" class="inline-form">
-    <input type="hidden" id="dm-edit-id" value="" />
-    <div class="form-row">
-      <div class="form-group">
-        <label>출하지명 (엑셀 원본명) <span class="required">*</span></label>
-        <input type="text" id="dm-departure-name" placeholder="예: 아산공장, 울산출하지" required />
-      </div>
-      <div class="form-group">
-        <label>출하지코드 <span class="required">*</span></label>
-        <input type="text" id="dm-departure-code" placeholder="예: AS, UL" required />
-      </div>
-      <div class="form-group form-group-btn">
-        <label>&nbsp;</label>
-        <div class="btn-row">
-          <button type="submit" class="btn btn-primary" id="dm-submit-btn">추가</button>
-          <button type="button" class="btn btn-outline" id="dm-cancel-btn" style="display:none" onclick="cancelDmEdit()">취소</button>
-        </div>
-      </div>
+  <div class="card-header-row">
+    <h2 class="card-title">② 출하지 매핑</h2>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button type="button" class="btn btn-sm btn-outline" id="dm-bulk-btn" onclick="toggleDmBulkEdit()">일괄 편집</button>
+      <button type="button" class="btn btn-sm btn-primary" onclick="showDmAddRow()">+ 추가</button>
     </div>
-  </form>
+  </div>
   <div id="dm-msg" class="form-msg" style="display:none"></div>
-
-  <div class="table-wrapper" style="margin-top:12px">
+  <div class="table-wrapper" style="margin-top:8px">
     <table class="data-table">
       <thead>
         <tr>
           <th><input type="checkbox" id="dm-check-all" onchange="toggleAllDmCheck(this.checked)" /></th>
-          <th>#</th><th>출하지명 (엑셀 원본명)</th><th>출하지코드</th><th>관리</th>
+          <th>#</th>
+          <th>출하지명(엑셀원본명) <span class="code-badge dm-badge">DM-A</span></th>
+          <th>출하지코드 <span class="code-badge dm-badge">DM-B</span></th>
+          <th>관리</th>
         </tr>
       </thead>
       <tbody id="dm-tbody">
@@ -120,47 +87,31 @@
   </div>
 </div>
 
-<!-- ───────────── ODCY 매핑 ───────────── -->
+<!-- ③ ODCY 매핑 -->
 <div class="card">
-  <h2 class="card-title">③ ODCY 매핑</h2>
-  <p class="card-desc">엑셀의 ODCY도착지명 → ODCY명으로 변환합니다. (보관료/상하차료 요율 조회 기준)</p>
-
-  <form id="om-form" class="inline-form">
-    <input type="hidden" id="om-edit-id" value="" />
-    <div class="form-row">
-      <div class="form-group">
-        <label>ODCY 도착지명 (엑셀 원본명) <span class="required">*</span></label>
-        <input type="text" id="om-dest-name" placeholder="예: SB청암, YCS양산" required />
-      </div>
-      <div class="form-group">
-        <label>ODCY명 <span class="required">*</span></label>
-        <input type="text" id="om-odcy-name" placeholder="예: 세방(주), 한진" required />
-      </div>
-      <div class="form-group">
-        <label>터미널구분 <span style="color:#6b7280;font-size:12px">(보관료/셔틀비 기준)</span></label>
-        <input type="text" id="om-terminal-type" placeholder="예: 배후단지, 일반" />
-      </div>
-      <div class="form-group form-group-btn">
-        <label>&nbsp;</label>
-        <div class="btn-row">
-          <button type="submit" class="btn btn-primary" id="om-submit-btn">추가</button>
-          <button type="button" class="btn btn-outline" id="om-cancel-btn" style="display:none" onclick="cancelOmEdit()">취소</button>
-        </div>
-      </div>
+  <div class="card-header-row">
+    <h2 class="card-title">③ ODCY 매핑</h2>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button type="button" class="btn btn-sm btn-outline" id="om-bulk-btn" onclick="toggleOmBulkEdit()">일괄 편집</button>
+      <button type="button" class="btn btn-sm btn-primary" onclick="showOmAddRow()">+ 추가</button>
     </div>
-  </form>
+  </div>
   <div id="om-msg" class="form-msg" style="display:none"></div>
-
-  <div class="table-wrapper" style="margin-top:12px">
+  <div class="table-wrapper" style="margin-top:8px">
     <table class="data-table">
       <thead>
         <tr>
           <th><input type="checkbox" id="om-check-all" onchange="toggleAllOmCheck(this.checked)" /></th>
-          <th>#</th><th>ODCY 도착지명 (엑셀 원본명)</th><th>ODCY명</th><th>터미널구분</th><th>관리</th>
+          <th>#</th>
+          <th>ODCY도착지명(엑셀원본명) <span class="code-badge om-badge">OM-A</span></th>
+          <th>ODCY명 <span class="code-badge om-badge">OM-B</span></th>
+          <th>odcy터미널구분 <span class="code-badge om-badge">OM-C</span></th>
+          <th>ODCY_위치 <span class="code-badge om-badge">OM-D</span></th>
+          <th>관리</th>
         </tr>
       </thead>
       <tbody id="om-tbody">
-        <tr><td colspan="6" class="empty-msg">불러오는 중...</td></tr>
+        <tr><td colspan="7" class="empty-msg">불러오는 중...</td></tr>
       </tbody>
     </table>
   </div>
@@ -173,21 +124,30 @@
 
 <style>
 .unified-upload-card { background: #f8fafc; border: 1px solid #e2e8f0; }
-.unified-upload-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+.unified-upload-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .unified-upload-label { font-weight: 600; color: #374151; font-size: 14px; margin-right: 4px; }
 .file-label { cursor: pointer; }
 .upload-result { font-size: 13px; font-weight: 500; }
 .upload-result.ok { color: #22c55e; }
 .upload-result.err { color: #ef4444; }
 .table-action-bar { display: flex; align-items: center; gap: 8px; }
+.card-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.inline-input {
+  width: 100%; padding: 4px 6px; border: 1px solid #d1d5db;
+  border-radius: 4px; font-size: 13px; box-sizing: border-box;
+}
+.inline-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+tr.editing-row td { background: #fffbeb !important; }
+tr.new-row td { background: #f0fdf4 !important; }
+.row-changed td { background-color: #fef9c3 !important; }
+.code-badge { display:inline-block; padding:1px 5px; border-radius:4px; font-size:10px; font-weight:700; margin-left:4px; vertical-align:middle; }
+.pm-badge { background:#dbeafe; color:#1d4ed8; }
+.dm-badge { background:#d1fae5; color:#065f46; }
+.om-badge { background:#fde68a; color:#92400e; }
+.bulk-editing { background: #fffbeb !important; }
 </style>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/mapping.js?v=5"></script>
+<script src="/static/js/mapping.js?v=6"></script>
 {% endblock %}
