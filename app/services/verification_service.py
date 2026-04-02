@@ -84,12 +84,15 @@ def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, conta
             unit = rate.get("shuttle_unit")
 
         if unit is not None:
-            # 보관료/상하차료/셔틀비: 단가 × 보관일수 × 수량
-            if storage_days is not None and storage_days >= 0:
-                expected = unit * storage_days * quantity
+            if charge_type == "보관료":
+                # 보관료: 단가 × 보관일수 × 수량
+                if storage_days is not None and storage_days >= 0:
+                    expected = unit * storage_days * quantity
+                else:
+                    expected = None
             else:
-                # 일수를 계산할 수 없으면 단가만 반환 (일수=None)
-                expected = None
+                # 상하차료/셔틀비: 단가 × 수량 (보관일수 무관)
+                expected = unit * quantity
         else:
             expected = None
     else:
