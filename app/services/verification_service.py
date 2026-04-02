@@ -55,7 +55,7 @@ def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) 
     out_dt = _parse_date_value(odcy_out_date_str)
     if in_dt is None or out_dt is None:
         return None, free_days
-    days = (out_dt - in_dt).days - free_days
+    days = (out_dt - in_dt).days + 1 - free_days
     return max(days, 0), free_days
 
 
