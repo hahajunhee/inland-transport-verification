@@ -413,15 +413,19 @@ def get_trkv_details(
 
     dep = str(departure_code or "").strip()
     routes = data_store.load("trkv_routes.json")
-    route = next(
-        (r for r in routes
-         if r.get("pickup_port") == pickup_port
-         and r.get("departure_code", r.get("departure_name", "")) == dep
-         and r.get("dest_port") == dest_port),
-        None,
-    )
+    route_row_num = None
+    route = None
+    for idx, r in enumerate(routes, 1):
+        if (r.get("pickup_port") == pickup_port
+            and r.get("departure_code", r.get("departure_name", "")) == dep
+            and r.get("dest_port") == dest_port):
+            route = r
+            route_row_num = idx
+            break
     if not route:
         return result
+
+    result["route_row_num"] = route_row_num
 
     price = route.get(f"tier{tier_num}")
     if price is None:

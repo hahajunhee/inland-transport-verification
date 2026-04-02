@@ -50,11 +50,20 @@ def find_storage_rate(
     candidates.sort(key=specificity, reverse=True)
     best = candidates[0]
 
+    # best의 행번호 찾기 (정렬된 전체 목록 기준)
+    all_sorted = sorted(items, key=lambda x: (x.get("odcy_name", ""), x.get("odcy_terminal_type", ""), x.get("id", 0)))
+    rate_row_num = None
+    for idx, r in enumerate(all_sorted, 1):
+        if r.get("id") == best.get("id"):
+            rate_row_num = idx
+            break
+
     t = tier_number if isinstance(tier_number, int) and tier_number in TIERS else 1
     return {
         "storage_unit":  best.get(f"storage_tier{t}"),
         "handling_unit": best.get(f"handling_tier{t}"),
         "shuttle_unit":  best.get(f"shuttle_tier{t}"),
+        "rate_row_num":  rate_row_num,
     }
 
 

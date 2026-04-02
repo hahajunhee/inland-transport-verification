@@ -111,105 +111,109 @@
             <th rowspan="3" class="sortable-th" onclick="sortBy('row_number')">행# <span class="sort-arrow">↕</span></th>
             <th rowspan="3" class="sortable-th" onclick="sortBy('container_no')">컨테이너번호 <span class="sort-arrow">↕</span></th>
             <th rowspan="3" class="sortable-th" onclick="sortBy('transport_date')">운송일자 <span class="sort-arrow">↕</span></th>
-            <th colspan="11" class="th-group th-route">운송 구간 정보</th>
-            <th colspan="5" class="th-group th-trkv">TRKV</th>
-            <th colspan="9" class="th-group th-info">구분값 정보</th>
-            <th colspan="5" class="th-group th-storage">보관료</th>
-            <th colspan="4" class="th-group th-handling">상하차료</th>
-            <th colspan="4" class="th-group th-shuttle">셔틀비용</th>
+            <th colspan="12" class="th-group th-route collapsible-group" data-group="route" onclick="toggleGroup('route')"><span class="group-toggle">▾</span> 운송 구간 정보</th>
+            <th colspan="5" class="th-group th-trkv collapsible-group" data-group="trkv" onclick="toggleGroup('trkv')"><span class="group-toggle">▾</span> TRKV</th>
+            <th colspan="10" class="th-group th-info collapsible-group" data-group="info" onclick="toggleGroup('info')"><span class="group-toggle">▾</span> 구분값 정보</th>
+            <th colspan="5" class="th-group th-storage collapsible-group" data-group="storage" onclick="toggleGroup('storage')"><span class="group-toggle">▾</span> 보관료</th>
+            <th colspan="4" class="th-group th-handling collapsible-group" data-group="handling" onclick="toggleGroup('handling')"><span class="group-toggle">▾</span> 상하차료</th>
+            <th colspan="4" class="th-group th-shuttle collapsible-group" data-group="shuttle" onclick="toggleGroup('shuttle')"><span class="group-toggle">▾</span> 셔틀비용</th>
             <th rowspan="3" class="sortable-th" onclick="sortBy('overall_status')">종합 <span class="sort-arrow">↕</span></th>
           </tr>
           <!-- 2행: 세부 헤더 -->
           <tr>
-            <!-- 운송 구간 정보 11열 -->
-            <th class="th-route sortable-th" onclick="sortBy('pickup_name')">픽업지명 <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('pickup_port_resolved')">픽업포트<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('departure_name')">출하지명 <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('departure_code_resolved')">출하지코드<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('odcy_name')">ODCY <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('dest_name')">도착지명 <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('dest_port_resolved')">도착포트<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('container_type')">컨테이너유형 <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('quantity')">수량 <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('weekend_holiday')">주말/휴일 <span class="sort-arrow">↕</span></th>
-            <th class="th-route sortable-th" onclick="sortBy('tier_number')">티어 <span class="sort-arrow">↕</span></th>
+            <!-- 운송 구간 정보 12열 -->
+            <th class="th-route cg-r sortable-th" onclick="sortBy('pickup_name')">픽업지명 <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('pickup_port_resolved')">픽업포트<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('departure_name')">출하지명 <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('departure_code_resolved')">출하지코드<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('odcy_name')">ODCY <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('dest_name')">도착지명 <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('dest_port_resolved')">도착포트<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('container_type')">컨테이너유형 <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('quantity')">수량 <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('weekend_holiday')">주말/휴일 <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('tier_number')">티어 <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r">TRKV요율#</th>
             <!-- TRKV 5열 -->
-            <th class="th-trkv sortable-th" onclick="sortBy('trkv_unit_rate')">단가 <span class="sort-arrow">↕</span></th>
-            <th class="th-trkv sortable-th" onclick="sortBy('trkv_actual')">청구 <span class="sort-arrow">↕</span></th>
-            <th class="th-trkv sortable-th" onclick="sortBy('trkv_expected')">예상 <span class="sort-arrow">↕</span></th>
-            <th class="th-trkv sortable-th" onclick="sortBy('trkv_diff')">차이 <span class="sort-arrow">↕</span></th>
-            <th class="th-trkv sortable-th" onclick="sortBy('trkv_status')">상태 <span class="sort-arrow">↕</span></th>
-            <!-- 구분값 정보 9열 -->
-            <th class="th-info">ODCY도착지명<br><small class="code-tag">[OM-A]</small></th>
-            <th class="th-info">도착지명</th>
-            <th class="th-info">odcy터미널구분<br><small class="code-tag">[OM-C]</small></th>
-            <th class="th-info">ODCY_위치<br><small class="code-tag">[OM-D]</small></th>
-            <th class="th-info">도착지포트구분<br><small class="code-tag">[PM-B]</small></th>
-            <th class="th-info">도착지터미널구분<br><small class="code-tag">[PM-C]</small></th>
-            <th class="th-info sortable-th" onclick="sortBy('odcy_in_date')">반입일 <span class="sort-arrow">↕</span></th>
-            <th class="th-info sortable-th" onclick="sortBy('odcy_out_date')">반출일 <span class="sort-arrow">↕</span></th>
-            <th class="th-info sortable-th" onclick="sortBy('storage_days')">보관일수 <span class="sort-arrow">↕</span></th>
+            <th class="th-trkv cg-t sortable-th" onclick="sortBy('trkv_unit_rate')">단가 <span class="sort-arrow">↕</span></th>
+            <th class="th-trkv cg-t sortable-th" onclick="sortBy('trkv_actual')">청구 <span class="sort-arrow">↕</span></th>
+            <th class="th-trkv cg-t sortable-th" onclick="sortBy('trkv_expected')">예상 <span class="sort-arrow">↕</span></th>
+            <th class="th-trkv cg-t sortable-th" onclick="sortBy('trkv_diff')">차이 <span class="sort-arrow">↕</span></th>
+            <th class="th-trkv cg-t sortable-th" onclick="sortBy('trkv_status')">상태 <span class="sort-arrow">↕</span></th>
+            <!-- 구분값 정보 10열 -->
+            <th class="th-info cg-i">ODCY도착지명<br><small class="code-tag">[OM-A]</small></th>
+            <th class="th-info cg-i">도착지명</th>
+            <th class="th-info cg-i">odcy터미널구분<br><small class="code-tag">[OM-C]</small></th>
+            <th class="th-info cg-i">ODCY_위치<br><small class="code-tag">[OM-D]</small></th>
+            <th class="th-info cg-i">도착지포트구분<br><small class="code-tag">[PM-B]</small></th>
+            <th class="th-info cg-i">도착지터미널구분<br><small class="code-tag">[PM-C]</small></th>
+            <th class="th-info cg-i sortable-th" onclick="sortBy('odcy_in_date')">반입일 <span class="sort-arrow">↕</span></th>
+            <th class="th-info cg-i sortable-th" onclick="sortBy('odcy_out_date')">반출일 <span class="sort-arrow">↕</span></th>
+            <th class="th-info cg-i sortable-th" onclick="sortBy('storage_days')">보관일수 <span class="sort-arrow">↕</span></th>
+            <th class="th-info cg-i">보관요율#</th>
             <!-- 보관료 5열 -->
-            <th class="th-storage">티어</th>
-            <th class="th-storage">청구</th><th class="th-storage">예상</th><th class="th-storage">차이</th>
-            <th class="th-storage sortable-th" onclick="sortBy('storage_status')">상태 <span class="sort-arrow">↕</span></th>
+            <th class="th-storage cg-s">티어</th>
+            <th class="th-storage cg-s">청구</th><th class="th-storage cg-s">예상</th><th class="th-storage cg-s">차이</th>
+            <th class="th-storage cg-s sortable-th" onclick="sortBy('storage_status')">상태 <span class="sort-arrow">↕</span></th>
             <!-- 상하차료 4열 -->
-            <th class="th-handling">청구</th><th class="th-handling">예상</th><th class="th-handling">차이</th>
-            <th class="th-handling sortable-th" onclick="sortBy('handling_status')">상태 <span class="sort-arrow">↕</span></th>
+            <th class="th-handling cg-h">청구</th><th class="th-handling cg-h">예상</th><th class="th-handling cg-h">차이</th>
+            <th class="th-handling cg-h sortable-th" onclick="sortBy('handling_status')">상태 <span class="sort-arrow">↕</span></th>
             <!-- 셔틀비용 4열 -->
-            <th class="th-shuttle">청구</th><th class="th-shuttle">예상</th><th class="th-shuttle">차이</th>
-            <th class="th-shuttle sortable-th" onclick="sortBy('shuttle_status')">상태 <span class="sort-arrow">↕</span></th>
+            <th class="th-shuttle cg-sh">청구</th><th class="th-shuttle cg-sh">예상</th><th class="th-shuttle cg-sh">차이</th>
+            <th class="th-shuttle cg-sh sortable-th" onclick="sortBy('shuttle_status')">상태 <span class="sort-arrow">↕</span></th>
           </tr>
           <!-- 3행: 출처 정보 -->
           <tr class="th-source-row">
-            <!-- 운송 구간 정보 11열 -->
-            <th class="th-source th-route">검증: 픽업지명</th>
-            <th class="th-source th-route">요율표: PM-A</th>
-            <th class="th-source th-route">검증: 출하지명</th>
-            <th class="th-source th-route">요율표: DM-A</th>
-            <th class="th-source th-route">검증: 상세ODCY</th>
-            <th class="th-source th-route">검증: 도착지명</th>
-            <th class="th-source th-route">요율표: PM-A</th>
-            <th class="th-source th-route">검증: Cont.Category</th>
-            <th class="th-source th-route">검증: Quantity</th>
-            <th class="th-source th-route">검증: Weekend/Holiday</th>
-            <th class="th-source th-route">요율표: 컨테이너티어</th>
+            <!-- 운송 구간 정보 12열 -->
+            <th class="th-source th-route cg-r">검증: 픽업지명</th>
+            <th class="th-source th-route cg-r">요율표: PM-A</th>
+            <th class="th-source th-route cg-r">검증: 출하지명</th>
+            <th class="th-source th-route cg-r">요율표: DM-A</th>
+            <th class="th-source th-route cg-r">검증: 상세ODCY</th>
+            <th class="th-source th-route cg-r">검증: 도착지명</th>
+            <th class="th-source th-route cg-r">요율표: PM-A</th>
+            <th class="th-source th-route cg-r">검증: Cont.Category</th>
+            <th class="th-source th-route cg-r">검증: Quantity</th>
+            <th class="th-source th-route cg-r">검증: Weekend/Holiday</th>
+            <th class="th-source th-route cg-r">요율표: 컨테이너티어</th>
+            <th class="th-source th-route cg-r">요율표: TRKV구간</th>
             <!-- TRKV 5열 -->
-            <th class="th-source th-trkv">요율표: TRKV구간</th>
-            <th class="th-source th-trkv">검증: Mobis운임합계</th>
-            <th class="th-source th-trkv">계산</th>
-            <th class="th-source th-trkv">계산</th>
-            <th class="th-source th-trkv">계산</th>
-            <!-- 구분값 정보 9열 -->
-            <th class="th-source th-info">검증: ODCY도착지명</th>
-            <th class="th-source th-info">검증: 도착지명</th>
-            <th class="th-source th-info">요율표: OM-C</th>
-            <th class="th-source th-info">요율표: OM-D</th>
-            <th class="th-source th-info">요율표: PM-B</th>
-            <th class="th-source th-info">요율표: PM-C</th>
-            <th class="th-source th-info">검증: ODCY 반입일</th>
-            <th class="th-source th-info">검증: ODCY 반출일</th>
-            <th class="th-source th-info">계산</th>
+            <th class="th-source th-trkv cg-t">요율표: TRKV구간</th>
+            <th class="th-source th-trkv cg-t">검증: Mobis운임합계</th>
+            <th class="th-source th-trkv cg-t">계산</th>
+            <th class="th-source th-trkv cg-t">계산</th>
+            <th class="th-source th-trkv cg-t">계산</th>
+            <!-- 구분값 정보 10열 -->
+            <th class="th-source th-info cg-i">검증: ODCY도착지명</th>
+            <th class="th-source th-info cg-i">검증: 도착지명</th>
+            <th class="th-source th-info cg-i">요율표: OM-C</th>
+            <th class="th-source th-info cg-i">요율표: OM-D</th>
+            <th class="th-source th-info cg-i">요율표: PM-B</th>
+            <th class="th-source th-info cg-i">요율표: PM-C</th>
+            <th class="th-source th-info cg-i">검증: ODCY 반입일</th>
+            <th class="th-source th-info cg-i">검증: ODCY 반출일</th>
+            <th class="th-source th-info cg-i">계산</th>
+            <th class="th-source th-info cg-i">요율표: 보관료</th>
             <!-- 보관료 5열 -->
-            <th class="th-source th-storage">요율표: 보관료</th>
-            <th class="th-source th-storage">검증: ODCY보관료</th>
-            <th class="th-source th-storage">계산</th>
-            <th class="th-source th-storage">계산</th>
-            <th class="th-source th-storage">계산</th>
+            <th class="th-source th-storage cg-s">요율표: 보관료</th>
+            <th class="th-source th-storage cg-s">검증: ODCY보관료</th>
+            <th class="th-source th-storage cg-s">계산</th>
+            <th class="th-source th-storage cg-s">계산</th>
+            <th class="th-source th-storage cg-s">계산</th>
             <!-- 상하차료 4열 -->
-            <th class="th-source th-handling">검증: ODCY상하차료</th>
-            <th class="th-source th-handling">계산</th>
-            <th class="th-source th-handling">계산</th>
-            <th class="th-source th-handling">계산</th>
+            <th class="th-source th-handling cg-h">검증: ODCY상하차료</th>
+            <th class="th-source th-handling cg-h">계산</th>
+            <th class="th-source th-handling cg-h">계산</th>
+            <th class="th-source th-handling cg-h">계산</th>
             <!-- 셔틀비용 4열 -->
-            <th class="th-source th-shuttle">검증: ODCY셔틀료</th>
-            <th class="th-source th-shuttle">계산</th>
-            <th class="th-source th-shuttle">계산</th>
-            <th class="th-source th-shuttle">계산</th>
+            <th class="th-source th-shuttle cg-sh">검증: ODCY셔틀료</th>
+            <th class="th-source th-shuttle cg-sh">계산</th>
+            <th class="th-source th-shuttle cg-sh">계산</th>
+            <th class="th-source th-shuttle cg-sh">계산</th>
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="42" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
+          <tr><td colspan="44" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>
@@ -217,6 +221,48 @@
   </div>
 </div>
 <style>
+/* ─── Sticky 3행 헤더 ─── */
+.result-table-wrapper {
+  max-height: calc(100vh - 320px);
+  overflow: auto;
+  position: relative;
+}
+.result-table thead th {
+  position: sticky;
+  z-index: 4;
+  border-bottom: 1px solid #d1d5db;
+}
+/* Row 1: group headers */
+.result-table thead tr:nth-child(1) th { top: 0; z-index: 5; }
+/* Row 2: column headers */
+.result-table thead tr:nth-child(2) th { top: 34px; z-index: 4; }
+/* Row 3: source info */
+.result-table thead tr:nth-child(3) th { top: 62px; z-index: 3; }
+
+/* ─── 접기/펼치기 그룹 ─── */
+.collapsible-group { cursor: pointer; user-select: none; }
+.collapsible-group:hover { filter: brightness(0.95); }
+.group-toggle { font-size: 10px; margin-right: 2px; }
+
+.result-table.hide-route .cg-r { display: none; }
+.result-table.hide-trkv .cg-t { display: none; }
+.result-table.hide-info .cg-i { display: none; }
+.result-table.hide-storage .cg-s { display: none; }
+.result-table.hide-handling .cg-h { display: none; }
+.result-table.hide-shuttle .cg-sh { display: none; }
+
+.result-table.hide-route [data-group="route"] { writing-mode: vertical-lr; white-space: nowrap; }
+.result-table.hide-trkv [data-group="trkv"] { writing-mode: vertical-lr; white-space: nowrap; }
+.result-table.hide-info [data-group="info"] { writing-mode: vertical-lr; white-space: nowrap; }
+.result-table.hide-storage [data-group="storage"] { writing-mode: vertical-lr; white-space: nowrap; }
+.result-table.hide-handling [data-group="handling"] { writing-mode: vertical-lr; white-space: nowrap; }
+.result-table.hide-shuttle [data-group="shuttle"] { writing-mode: vertical-lr; white-space: nowrap; }
+
+/* ─── 요율 참조행 배지 ─── */
+.ref-badge { display:inline-block; padding:1px 6px; border-radius:8px; font-size:11px; font-weight:700; }
+.ref-trkv { background:#e0f2fe; color:#0369a1; }
+.ref-storage { background:#f3e8ff; color:#7c3aed; }
+
 .result-count {
   margin-top: 8px;
   font-size: 13px;
@@ -254,5 +300,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/verification.js?v=6"></script>
+<script src="/static/js/verification.js?v=7"></script>
 {% endblock %}

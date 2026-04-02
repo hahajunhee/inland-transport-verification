@@ -4,7 +4,7 @@ let currentSessionId = null;
 let currentFilter = "ALL";
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
-const EMPTY_COLS = 42;     // colspan for empty message
+const EMPTY_COLS = 44;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -233,52 +233,55 @@ function renderRow(r) {
     <td>${r.row_number}</td>
     <td>${r.container_no || "-"}</td>
     <td>${r.transport_date || "-"}</td>
-    <!-- 운송 구간 정보 (11열) -->
-    <td>${r.pickup_name || "-"}</td>
-    <td>${pickupPort}</td>
-    <td>${r.departure_name || "-"}</td>
-    <td>${r.departure_code_resolved ? `<span class="port-resolved">${r.departure_code_resolved}</span>` : "-"}</td>
-    <td title="${r.odcy_name || ""}">${r.odcy_code || r.odcy_name || "-"}</td>
-    <td>${r.dest_name || "-"}</td>
-    <td>${destPort}</td>
-    <td>${r.container_type || "-"}</td>
-    <td class="money">${qty}</td>
-    <td class="td-center">${whCell}</td>
-    <td class="td-tier">${tierBadge}</td>
+    <!-- 운송 구간 정보 (12열) -->
+    <td class="cg-r">${r.pickup_name || "-"}</td>
+    <td class="cg-r">${pickupPort}</td>
+    <td class="cg-r">${r.departure_name || "-"}</td>
+    <td class="cg-r">${r.departure_code_resolved ? `<span class="port-resolved">${r.departure_code_resolved}</span>` : "-"}</td>
+    <td class="cg-r" title="${r.odcy_name || ""}">${r.odcy_code || r.odcy_name || "-"}</td>
+    <td class="cg-r">${r.dest_name || "-"}</td>
+    <td class="cg-r">${destPort}</td>
+    <td class="cg-r">${r.container_type || "-"}</td>
+    <td class="money cg-r">${qty}</td>
+    <td class="td-center cg-r">${whCell}</td>
+    <td class="td-tier cg-r">${tierBadge}</td>
+    <td class="td-center cg-r">${r.trkv_rate_row != null ? `<span class="ref-badge ref-trkv">#${r.trkv_rate_row}</span>` : '-'}</td>
     <!-- TRKV (5열: 단가 + 청구 + 예상 + 차이 + 상태) -->
-    <td class="money trkv-unit">${unitRate}</td>
-    ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status)}
-    <!-- 구분값 정보 (9열) -->
-    <td class="td-info">${r.odcy_destination_name || "-"}</td>
-    <td class="td-info">${r.dest_name || "-"}</td>
-    <td class="td-info">${r.odcy_terminal_type || "-"}</td>
-    <td class="td-info">${r.odcy_location || "-"}</td>
-    <td class="td-info">${r.dest_port_type || "-"}</td>
-    <td class="td-info">${r.dest_terminal_type || "-"}</td>
-    <td class="td-info" style="font-size:11px">${fmtDateOnly(r.odcy_in_date)}</td>
-    <td class="td-info" style="font-size:11px">${fmtDateOnly(r.odcy_out_date)}</td>
-    <td class="td-info td-center">${storageDays}</td>
+    <td class="money trkv-unit cg-t">${unitRate}</td>
+    ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status, 'cg-t')}
+    <!-- 구분값 정보 (10열) -->
+    <td class="td-info cg-i">${r.odcy_destination_name || "-"}</td>
+    <td class="td-info cg-i">${r.dest_name || "-"}</td>
+    <td class="td-info cg-i">${r.odcy_terminal_type || "-"}</td>
+    <td class="td-info cg-i">${r.odcy_location || "-"}</td>
+    <td class="td-info cg-i">${r.dest_port_type || "-"}</td>
+    <td class="td-info cg-i">${r.dest_terminal_type || "-"}</td>
+    <td class="td-info cg-i" style="font-size:11px">${fmtDateOnly(r.odcy_in_date)}</td>
+    <td class="td-info cg-i" style="font-size:11px">${fmtDateOnly(r.odcy_out_date)}</td>
+    <td class="td-info td-center cg-i">${storageDays}</td>
+    <td class="td-center cg-i">${r.storage_rate_row != null ? `<span class="ref-badge ref-storage">#${r.storage_rate_row}</span>` : '-'}</td>
     <!-- 보관료 (5열: 티어 + 청구 + 예상 + 차이 + 상태) -->
-    <td class="td-tier">${storageTierBadge}</td>
-    ${chargeCell(r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status)}
+    <td class="td-tier cg-s">${storageTierBadge}</td>
+    ${chargeCell(r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status, 'cg-s')}
     <!-- 상하차료 -->
-    ${chargeCell(r.handling_actual, r.handling_expected, r.handling_diff, r.handling_status)}
+    ${chargeCell(r.handling_actual, r.handling_expected, r.handling_diff, r.handling_status, 'cg-h')}
     <!-- 셔틀비용 -->
-    ${chargeCell(r.shuttle_actual, r.shuttle_expected, r.shuttle_diff, r.shuttle_status)}
+    ${chargeCell(r.shuttle_actual, r.shuttle_expected, r.shuttle_diff, r.shuttle_status, 'cg-sh')}
     <!-- 종합 -->
     <td class="${statusClass(r.overall_status)}">${r.overall_status || "-"}</td>
   </tr>`;
 }
 
-function chargeCell(actual, expected, diff, status) {
+function chargeCell(actual, expected, diff, status, cg) {
   const sc = statusClass(status);
   const diffStr = diff != null ? (diff >= 0 ? "+" : "") + fmtMoney(diff) : "-";
   const diffColor = diff > 0.5 ? 'style="color:#c62828"' : diff < -0.5 ? 'style="color:#1a73e8"' : "";
+  const gc = cg ? ` ${cg}` : '';
   return `
-    <td class="money">${fmtMoney(actual)}</td>
-    <td class="money">${expected != null ? fmtMoney(expected) : "-"}</td>
-    <td class="money" ${diffColor}>${diffStr}</td>
-    <td class="${sc}">${status || "-"}</td>
+    <td class="money${gc}">${fmtMoney(actual)}</td>
+    <td class="money${gc}">${expected != null ? fmtMoney(expected) : "-"}</td>
+    <td class="money${gc}" ${diffColor}>${diffStr}</td>
+    <td class="${sc}${gc}">${status || "-"}</td>
   `;
 }
 
@@ -304,4 +307,31 @@ function showError(msg) {
   const el = document.getElementById("upload-error");
   el.textContent = msg;
   el.style.display = "block";
+}
+
+// ─── 접기/펼치기 그룹 ─────────────────────────────────────
+const groupColspans = {
+  route: 12, trkv: 5, info: 10, storage: 5, handling: 4, shuttle: 4,
+};
+const hiddenGroups = new Set();
+
+function toggleGroup(group) {
+  const table = document.querySelector('.result-table');
+  if (hiddenGroups.has(group)) {
+    hiddenGroups.delete(group);
+    table.classList.remove(`hide-${group}`);
+    const th = table.querySelector(`[data-group="${group}"]`);
+    if (th) {
+      th.setAttribute('colspan', groupColspans[group]);
+      th.querySelector('.group-toggle').textContent = '\u25BE';
+    }
+  } else {
+    hiddenGroups.add(group);
+    table.classList.add(`hide-${group}`);
+    const th = table.querySelector(`[data-group="${group}"]`);
+    if (th) {
+      th.setAttribute('colspan', '1');
+      th.querySelector('.group-toggle').textContent = '\u25B8';
+    }
+  }
 }

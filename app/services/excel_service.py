@@ -186,13 +186,13 @@ STATUS_FILL = {
 _SECTIONS = [
     # (start_col, end_col, label, group_bg, col_bg, col_font)
     (1,   3,  "기본 정보",      "374151", "E5E7EB", "374151"),
-    (4,   14, "운송 구간 정보", "0F766E", "CCFBF1", "0F766E"),
-    (15,  19, "TRKV",           "1A73E8", "E8F0FE", "1A73E8"),
-    (20,  28, "구분값 정보",    "6B21A8", "F3E8FF", "6B21A8"),
-    (29,  33, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
-    (34,  37, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
-    (38,  41, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
-    (42,  42, "종합",           "374151", "E5E7EB", "374151"),
+    (4,   15, "운송 구간 정보", "0F766E", "CCFBF1", "0F766E"),
+    (16,  20, "TRKV",           "1A73E8", "E8F0FE", "1A73E8"),
+    (21,  30, "구분값 정보",    "6B21A8", "F3E8FF", "6B21A8"),
+    (31,  35, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
+    (36,  39, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
+    (40,  43, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
+    (44,  44, "종합",           "374151", "E5E7EB", "374151"),
 ]
 
 def _col_style(col_idx: int):
@@ -210,12 +210,12 @@ def generate_results_excel(results: list) -> bytes:
 
     headers = [
         "행번호", "컨테이너번호", "운송일자", "픽업지코드", "픽업지명",
-        "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호",
+        "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호", "TRKV요율#",
         # TRKV
         "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
         # 구분값 정보
         "ODCY도착지명", "도착지명(원본)", "odcy터미널구분", "ODCY_위치", "도착지포트구분", "도착지터미널구분",
-        "ODCY반입일", "ODCY반출일", "보관일수",
+        "ODCY반입일", "ODCY반출일", "보관일수", "보관요율#",
         # 보관료
         "보관료티어", "보관료청구금액", "보관료예상금액", "보관료차이금액", "보관료상태",
         # 상하차료
@@ -251,23 +251,23 @@ def generate_results_excel(results: list) -> bytes:
     sources = [
         # 기본 정보 (1-3)
         "생성", "검증: Contrainer No.", "검증: 출하일",
-        # 운송 구간 정보 (4-14)
+        # 운송 구간 정보 (4-15)
         "검증: 픽업지명", "요율표: PM-A", "검증: 출하지명", "요율표: DM-A",
         "검증: 상세ODCY", "검증: 도착지명", "요율표: PM-A",
-        "검증: Cont.Category", "검증: Quantity", "검증: Weekend/Holiday", "요율표: 컨테이너티어",
-        # TRKV (15-19)
+        "검증: Cont.Category", "검증: Quantity", "검증: Weekend/Holiday", "요율표: 컨테이너티어", "요율표: TRKV구간",
+        # TRKV (16-20)
         "요율표: TRKV구간", "검증: Mobis운임합계", "계산", "계산", "계산",
-        # 구분값 정보 (20-28)
+        # 구분값 정보 (21-30)
         "검증: ODCY도착지명", "검증: 도착지명",
         "요율표: OM-C", "요율표: OM-D", "요율표: PM-B", "요율표: PM-C",
-        "검증: ODCY 반입일", "검증: ODCY 반출일", "계산",
-        # 보관료 (29-33)
+        "검증: ODCY 반입일", "검증: ODCY 반출일", "계산", "요율표: 보관료",
+        # 보관료 (31-35)
         "요율표: 보관료", "검증: ODCY 보관료", "계산", "계산", "계산",
-        # 상하차료 (34-37)
+        # 상하차료 (36-39)
         "검증: ODCY 상하차료", "계산", "계산", "계산",
-        # 셔틀비용 (38-41)
+        # 셔틀비용 (40-43)
         "검증: ODCY 셔틀료", "계산", "계산", "계산",
-        # 종합 (42)
+        # 종합 (44)
         "계산",
     ]
     ws.append(sources)
@@ -287,12 +287,12 @@ def generate_results_excel(results: list) -> bytes:
             g("pickup_code"), g("pickup_name"),
             g("odcy_code"), g("odcy_name"),
             g("dest_code"), g("dest_name"),
-            g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"), g("weekend_holiday") or "", g("tier_number"),
+            g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"), g("weekend_holiday") or "", g("tier_number"), g("trkv_rate_row"),
             g("trkv_unit_rate"), g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
             # 구분값 정보
             g("odcy_destination_name"), g("dest_name"),
             g("odcy_terminal_type"), g("odcy_location"), g("dest_port_type"), g("dest_terminal_type"),
-            g("odcy_in_date"), g("odcy_out_date"), g("storage_days"),
+            g("odcy_in_date"), g("odcy_out_date"), g("storage_days"), g("storage_rate_row"),
             # 보관료
             g("storage_tier_number"), g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
             g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),
