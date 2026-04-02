@@ -48,15 +48,26 @@ def _get_free_days(odcy_location: str) -> int:
         return FREE_TIME_DAYS
     return 0
 
-def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) -> tuple[int | None, int]:
-    """보관일수 계산: 반출일 - 반입일 - FREE타임. 반환: (storage_days, free_days)"""
-    free_days = _get_free_days(odcy_location)
+def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) -> tuple[int | None, int | None, int]:
+    """보관일수 계산. 반환: (raw_days, billable_days, free_days)
+    - raw_days: 반출일 - 반입일 + 1 (순수 보관일수, 표시용)
+    - billable_days: raw_days - free_days (보관료 계산용)
+    - free_days: FREE 적용 일수 (4일 이상일 때만 적용)
+    """
     in_dt = _parse_date_value(odcy_in_date_str)
     out_dt = _parse_date_value(odcy_out_date_str)
     if in_dt is None or out_dt is None:
-        return None, free_days
-    days = (out_dt - in_dt).days + 1 - free_days
-    return max(days, 0), free_days
+        return None, None, 0
+    raw_days = (out_dt - in_dt).days + 1  # 순수 보관일수
+
+    # FREE 적용: 해당 위치이고 보관일수 4일 이상일 때만
+    free_days = 0
+    if odcy_location and odcy_location.strip() in FREE_TIME_LOCATIONS:
+        if raw_days >= 4:
+            free_days = FREE_TIME_DAYS
+
+    billable_days = max(raw_days - free_days, 0)
+    return raw_days, billable_days, free_days
 
 
 def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
@@ -158,7 +169,7 @@ def run_verification(filename: str, rows: list) -> dict:
         # 보관일수 계산
         odcy_in_date  = row.get("odcy_in_date")
         odcy_out_date = row.get("odcy_out_date")
-        storage_days, free_days = _calc_storage_days(odcy_in_date, odcy_out_date, odcy_location)
+        raw_days, billable_days, free_days = _calc_storage_days(odcy_in_date, odcy_out_date, odcy_location)
 
         result = {
             "id": result_id,
@@ -191,7 +202,8 @@ def run_verification(filename: str, rows: list) -> dict:
             "storage_tier_number": storage_tier_number,
             "odcy_in_date": odcy_in_date,
             "odcy_out_date": odcy_out_date,
-            "storage_days": storage_days,
+            "storage_days": raw_days,
+            "billable_days": billable_days,
             "free_days": free_days,
         }
 
@@ -206,23 +218,34 @@ def run_verification(filename: str, rows: list) -> dict:
 
         result_id += 1
 
+        # 직반입 판정: ODCY도착지명이 공란이면 터미널 직반입건
+        is_direct_delivery = not odcy_destination_name or str(odcy_destination_name).strip() == ""
+
         statuses = []
         storage_rate_row = None
         for (charge_type, actual_key, exp_key, diff_key, status_key) in CHARGES:
             actual = row.get(actual_key, 0.0)
-            expected, diff, status, rate_row = _verify_charge(
-                charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
-                pickup_name=pickup_name, departure_name=departure_name, dest_name=dest_name,
-                cont_type=cont_type, dg_raw=dg_raw, quantity=quantity,
-                weekend_holiday=weekend_holiday,
-                odcy_name_resolved=odcy_name_resolved,
-                odcy_terminal_type=odcy_terminal_type,
-                odcy_location=odcy_location,
-                dest_port_type=dest_port_type,
-                dest_terminal_type=dest_terminal_type,
-                storage_tier_number=storage_tier_number,
-                storage_days=storage_days,
-            )
+
+            # 직반입건: 보관료/상하차료/셔틀비용은 0원이 정상
+            if is_direct_delivery and charge_type in ("보관료", "상하차료", "셔틀비용"):
+                expected = 0.0
+                diff = actual - expected
+                status = "OK" if abs(diff) < TOLERANCE else "DIFF"
+                rate_row = None
+            else:
+                expected, diff, status, rate_row = _verify_charge(
+                    charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
+                    pickup_name=pickup_name, departure_name=departure_name, dest_name=dest_name,
+                    cont_type=cont_type, dg_raw=dg_raw, quantity=quantity,
+                    weekend_holiday=weekend_holiday,
+                    odcy_name_resolved=odcy_name_resolved,
+                    odcy_terminal_type=odcy_terminal_type,
+                    odcy_location=odcy_location,
+                    dest_port_type=dest_port_type,
+                    dest_terminal_type=dest_terminal_type,
+                    storage_tier_number=storage_tier_number,
+                    storage_days=billable_days,
+                )
             result[actual_key] = actual
             result[exp_key] = expected
             result[diff_key] = diff
