@@ -188,11 +188,11 @@ _SECTIONS = [
     (1,   3,  "기본 정보",      "374151", "E5E7EB", "374151"),
     (4,   15, "운송 구간 정보", "0F766E", "CCFBF1", "0F766E"),
     (16,  20, "TRKV",           "1A73E8", "E8F0FE", "1A73E8"),
-    (21,  30, "구분값 정보",    "6B21A8", "F3E8FF", "6B21A8"),
-    (31,  35, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
-    (36,  39, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
-    (40,  43, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
-    (44,  44, "종합",           "374151", "E5E7EB", "374151"),
+    (21,  31, "구분값 정보",    "6B21A8", "F3E8FF", "6B21A8"),
+    (32,  36, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
+    (37,  40, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
+    (41,  44, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
+    (45,  45, "종합",           "374151", "E5E7EB", "374151"),
 ]
 
 def _col_style(col_idx: int):
@@ -215,7 +215,7 @@ def generate_results_excel(results: list) -> bytes:
         "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
         # 구분값 정보
         "ODCY도착지명", "도착지명(원본)", "odcy터미널구분", "ODCY_위치", "도착지포트구분", "도착지터미널구분",
-        "ODCY반입일", "ODCY반출일", "보관일수", "보관요율#",
+        "ODCY반입일", "ODCY반출일", "보관일수", "FREE타임", "보관요율#",
         # 보관료
         "보관료티어", "보관료청구금액", "보관료예상금액", "보관료차이금액", "보관료상태",
         # 상하차료
@@ -260,7 +260,7 @@ def generate_results_excel(results: list) -> bytes:
         # 구분값 정보 (21-30)
         "검증: ODCY도착지명", "검증: 도착지명",
         "요율표: OM-C", "요율표: OM-D", "요율표: PM-B", "요율표: PM-C",
-        "검증: ODCY 반입일", "검증: ODCY 반출일", "계산", "요율표: 보관료",
+        "검증: ODCY 반입일", "검증: ODCY 반출일", "계산", "계산", "요율표: 보관료",
         # 보관료 (31-35)
         "요율표: 보관료", "검증: ODCY 보관료", "계산", "계산", "계산",
         # 상하차료 (36-39)
@@ -292,7 +292,7 @@ def generate_results_excel(results: list) -> bytes:
             # 구분값 정보
             g("odcy_destination_name"), g("dest_name"),
             g("odcy_terminal_type"), g("odcy_location"), g("dest_port_type"), g("dest_terminal_type"),
-            g("odcy_in_date"), g("odcy_out_date"), g("storage_days"), g("storage_rate_row"),
+            g("odcy_in_date"), g("odcy_out_date"), g("storage_days"), g("free_days"), g("storage_rate_row"),
             # 보관료
             g("storage_tier_number"), g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
             g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),

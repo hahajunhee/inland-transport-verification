@@ -636,6 +636,13 @@ def _process_upload(wb):
                     for m in data_store.load("port_mappings.json")
                 }
 
+                # B~G열 직접 읽기용 컬럼 인덱스 (루프 밖에서 한번만 검색)
+                om_b_col = _find_col(col_map, "ODCY명 [OM-B]", "ODCY명")
+                om_c_col = _find_col(col_map, "odcy터미널구분 [OM-C]", "odcy터미널구분")
+                om_d_col = _find_col(col_map, "ODCY_위치 [OM-D]", "ODCY_위치")
+                pm_b_col = _find_col(col_map, "포트 구분 [PM-B]", "포트 구분")
+                pm_c_col = _find_col(col_map, "터미널구분 [PM-C]")
+
             else:
                 # 구 형식: ODCY명 직접 입력
                 odcy_col  = _find_col(col_map, "ODCY명")
@@ -656,14 +663,23 @@ def _process_upload(wb):
                     odcy_dest_val  = str(_gv2(odcy_dest_col) or "").strip()
                     port_excel_val = str(_gv2(port_excel_col) or "").strip()
 
+                    # B~G열 직접 읽기 (사용자가 직접 입력한 경우 우선 사용)
+                    direct_odcy_name     = str(_gv2(om_b_col) or "").strip() if om_b_col is not None else ""
+                    direct_odcy_term     = str(_gv2(om_c_col) or "").strip() if om_c_col is not None else ""
+                    direct_odcy_loc      = str(_gv2(om_d_col) or "").strip() if om_d_col is not None else ""
+                    direct_port_type     = str(_gv2(pm_b_col) or "").strip() if pm_b_col is not None else ""
+                    direct_terminal_type = str(_gv2(pm_c_col) or "").strip() if pm_c_col is not None else ""
+
+                    # 매핑 resolve
                     odcy_entry = _odcy_map.get(odcy_dest_val, {})
                     port_entry = _port_map.get(port_excel_val, {})
 
-                    odcy_name          = odcy_entry.get("odcy_name", "")
-                    odcy_terminal_type = odcy_entry.get("odcy_terminal_type", "")
-                    odcy_location      = odcy_entry.get("odcy_location", "")
-                    dest_port_type     = port_entry.get("port_type", "")
-                    dest_terminal_type = port_entry.get("terminal_type", "")
+                    # B~G열 직접값이 있으면 우선, 없으면 매핑으로 resolve
+                    odcy_name          = direct_odcy_name or odcy_entry.get("odcy_name", "")
+                    odcy_terminal_type = direct_odcy_term or odcy_entry.get("odcy_terminal_type", "")
+                    odcy_location      = direct_odcy_loc or odcy_entry.get("odcy_location", "")
+                    dest_port_type     = direct_port_type or port_entry.get("port_type", "")
+                    dest_terminal_type = direct_terminal_type or port_entry.get("terminal_type", "")
                 else:
                     odcy_name          = str(_gv2(odcy_col) or "").strip()
                     odcy_terminal_type = str(_gv2(term_col2) or "").strip()
@@ -685,6 +701,9 @@ def _process_upload(wb):
                     "dest_terminal_type": dest_terminal_type,
                     "memo": str(_gv2(memo_col) or "").strip(),
                 }
+                if use_new_format:
+                    obj["odcy_destination_name"] = odcy_dest_val
+                    obj["port_excel_name"] = port_excel_val
                 all_none = True
                 for prefix, key in sr_cols.items():
                     for t in range(1, 7):

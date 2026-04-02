@@ -41,93 +41,16 @@
   </div>
 </div>
 
-<!-- ───────────── 요율 등록 폼 ───────────── -->
-<div class="card">
-  <h2 class="card-title">요율 등록</h2>
-
-  <form id="sr-form">
-    <input type="hidden" id="sr-edit-id" value="" />
-
-    <!-- 기본 정보 (5개 키) -->
-    <div class="form-row" style="margin-bottom:10px">
-      <div class="form-group">
-        <label>ODCY명 <span class="required">*</span></label>
-        <input type="text" id="sr-odcy-name" placeholder="예: 세방(주), 한진" required />
-      </div>
-      <div class="form-group">
-        <label>odcy터미널구분 <span class="required">*</span></label>
-        <input type="text" id="sr-odcy-terminal-type" placeholder="예: 배후단지, 일반" required />
-      </div>
-      <div class="form-group">
-        <label>ODCY_위치</label>
-        <input type="text" id="sr-odcy-location" placeholder="예: 부산신항" />
-      </div>
-      <div class="form-group">
-        <label>도착지포트구분</label>
-        <input type="text" id="sr-dest-port-type" placeholder="예: 부산북항" />
-      </div>
-      <div class="form-group">
-        <label>도착지터미널구분</label>
-        <input type="text" id="sr-dest-terminal-type" placeholder="예: 일반" />
-      </div>
-    </div>
-    <div class="form-row" style="margin-bottom:10px">
-      <div class="form-group">
-        <label>비고</label>
-        <input type="text" id="sr-memo" placeholder="메모" />
-      </div>
-      <div class="form-group form-group-btn">
-        <label>&nbsp;</label>
-        <div class="btn-row">
-          <button type="submit" class="btn btn-primary" id="sr-submit-btn">추가</button>
-          <button type="button" class="btn btn-outline" id="sr-cancel-btn" style="display:none" onclick="cancelSrEdit()">취소</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 티어 단가 입력 -->
-    <div class="tier-input-grid">
-      <div class="tier-group">
-        <div class="tier-group-label">보관료 단가</div>
-        <div class="tier-row">
-          {% for t in range(1,7) %}
-          <div class="tier-cell">
-            <label>T{{t}}</label>
-            <input type="number" id="sr-storage-tier{{t}}" placeholder="-" min="0" step="1" />
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="tier-group">
-        <div class="tier-group-label">상하차료 단가</div>
-        <div class="tier-row">
-          {% for t in range(1,7) %}
-          <div class="tier-cell">
-            <label>T{{t}}</label>
-            <input type="number" id="sr-handling-tier{{t}}" placeholder="-" min="0" step="1" />
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      <div class="tier-group">
-        <div class="tier-group-label">셔틀비 단가</div>
-        <div class="tier-row">
-          {% for t in range(1,7) %}
-          <div class="tier-cell">
-            <label>T{{t}}</label>
-            <input type="number" id="sr-shuttle-tier{{t}}" placeholder="-" min="0" step="1" />
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </form>
-  <div id="sr-msg" class="form-msg" style="display:none"></div>
-</div>
-
 <!-- ───────────── 요율 목록 ───────────── -->
 <div class="card">
-  <h2 class="card-title">등록된 요율</h2>
+  <div class="card-header-row">
+    <h2 class="card-title">등록된 요율</h2>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button type="button" class="btn btn-sm btn-outline" id="sr-bulk-btn" onclick="toggleSrBulkEdit()">일괄 편집</button>
+      <button type="button" class="btn btn-sm btn-primary" onclick="showSrAddRow()">+ 추가</button>
+    </div>
+  </div>
+  <div id="sr-msg" class="form-msg" style="display:none"></div>
 
   <div class="table-wrapper" style="overflow-x:auto">
     <table class="data-table sr-table">
@@ -135,11 +58,11 @@
         <tr>
           <th rowspan="2"><input type="checkbox" id="sr-check-all" onchange="toggleAllSrCheck(this.checked)" /></th>
           <th rowspan="2">#</th>
-          <th rowspan="2">ODCY명</th>
-          <th rowspan="2">odcy터미널구분</th>
-          <th rowspan="2">ODCY_위치</th>
-          <th rowspan="2">도착지포트구분</th>
-          <th rowspan="2">도착지터미널구분</th>
+          <th rowspan="2">ODCY명<br><small class="code-badge om-badge">OM-B</small></th>
+          <th rowspan="2">odcy터미널구분<br><small class="code-badge om-badge">OM-C</small></th>
+          <th rowspan="2">ODCY_위치<br><small class="code-badge om-badge">OM-D</small></th>
+          <th rowspan="2">도착지포트구분<br><small class="code-badge pm-badge">PM-B</small></th>
+          <th rowspan="2">도착지터미널구분<br><small class="code-badge pm-badge">PM-C</small></th>
           <th colspan="6" class="th-group th-storage">보관료 단가</th>
           <th colspan="6" class="th-group th-handling">상하차료 단가</th>
           <th colspan="6" class="th-group th-shuttle">셔틀비 단가</th>
@@ -175,16 +98,6 @@
 .upload-result.err { color:#ef4444; }
 .table-action-bar { display:flex; align-items:center; gap:8px; }
 
-/* 티어 입력 그리드 */
-.tier-input-grid { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
-.tier-group { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 12px; }
-.tier-group-label { font-size:13px; font-weight:600; color:#374151; margin-bottom:6px; }
-.tier-row { display:flex; gap:8px; flex-wrap:wrap; }
-.tier-cell { display:flex; flex-direction:column; align-items:center; min-width:80px; }
-.tier-cell label { font-size:11px; color:#6b7280; margin-bottom:3px; font-weight:600; }
-.tier-cell input { width:80px; text-align:right; padding:4px 6px; font-size:13px;
-  border:1px solid #d1d5db; border-radius:4px; }
-
 /* 요율 테이블 */
 .sr-table th, .sr-table td { min-width:64px; text-align:center; font-size:12px; }
 .sr-table td:nth-child(3), .sr-table td:nth-child(4), .sr-table td:nth-child(5),
@@ -193,9 +106,20 @@
 .th-storage  { background:#dbeafe !important; color:#1e40af; }
 .th-handling { background:#dcfce7 !important; color:#166534; }
 .th-shuttle  { background:#fef9c3 !important; color:#854d0e; }
+
+/* 인라인 편집 */
+.code-badge { display:inline-block; padding:1px 5px; border-radius:4px; font-size:10px; font-weight:700; }
+.om-badge { background:#fde68a; color:#92400e; }
+.pm-badge { background:#dbeafe; color:#1d4ed8; }
+.card-header-row { display:flex; align-items:center; justify-content:space-between; }
+.inline-input { width:100%; padding:3px 5px; border:1px solid #d1d5db; border-radius:4px; font-size:12px; box-sizing:border-box; }
+.inline-input:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,0.15); }
+tr.editing-row td { background:#fffbeb !important; }
+tr.new-row td { background:#f0fdf4 !important; }
+.inline-num { width:70px; text-align:right; padding:3px 5px; border:1px solid #d1d5db; border-radius:4px; font-size:12px; }
 </style>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/storage_rates.js?v=4"></script>
+<script src="/static/js/storage_rates.js?v=5"></script>
 {% endblock %}

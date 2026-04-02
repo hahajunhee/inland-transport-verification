@@ -4,7 +4,7 @@ let currentSessionId = null;
 let currentFilter = "ALL";
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
-const EMPTY_COLS = 44;     // colspan for empty message
+const EMPTY_COLS = 45;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -259,6 +259,7 @@ function renderRow(r) {
     <td class="td-info cg-i" style="font-size:11px">${fmtDateOnly(r.odcy_in_date)}</td>
     <td class="td-info cg-i" style="font-size:11px">${fmtDateOnly(r.odcy_out_date)}</td>
     <td class="td-info td-center cg-i">${storageDays}</td>
+    <td class="td-center td-info cg-i">${r.free_days != null && r.free_days > 0 ? `<span style="color:#dc2626;font-weight:700">-${r.free_days}일</span>` : '<span style="color:#9ca3af">0</span>'}</td>
     <td class="td-center cg-i">${r.storage_rate_row != null ? `<span class="ref-badge ref-storage">#${r.storage_rate_row}</span>` : '-'}</td>
     <!-- 보관료 (5열: 티어 + 청구 + 예상 + 차이 + 상태) -->
     <td class="td-tier cg-s">${storageTierBadge}</td>
@@ -311,7 +312,7 @@ function showError(msg) {
 
 // ─── 접기/펼치기 그룹 ─────────────────────────────────────
 const groupColspans = {
-  route: 12, trkv: 5, info: 10, storage: 5, handling: 4, shuttle: 4,
+  route: 12, trkv: 5, info: 11, storage: 5, handling: 4, shuttle: 4,
 };
 const hiddenGroups = new Set();
 

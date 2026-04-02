@@ -39,16 +39,24 @@ def _parse_date_value(val) -> date | None:
     return None
 
 
-def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) -> int | None:
-    """보관일수 계산: 반출일 - 반입일 (부산신항이면 -3일 추가 차감)."""
+FREE_TIME_LOCATIONS = {"부산신항", "KRPUSN"}
+FREE_TIME_DAYS = 3
+
+def _get_free_days(odcy_location: str) -> int:
+    """FREE타임 적용 일수 반환."""
+    if odcy_location and odcy_location.strip() in FREE_TIME_LOCATIONS:
+        return FREE_TIME_DAYS
+    return 0
+
+def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) -> tuple[int | None, int]:
+    """보관일수 계산: 반출일 - 반입일 - FREE타임. 반환: (storage_days, free_days)"""
+    free_days = _get_free_days(odcy_location)
     in_dt = _parse_date_value(odcy_in_date_str)
     out_dt = _parse_date_value(odcy_out_date_str)
     if in_dt is None or out_dt is None:
-        return None
-    days = (out_dt - in_dt).days
-    if odcy_location and odcy_location.strip() == "부산신항":
-        days = days - 3
-    return max(days, 0)
+        return None, free_days
+    days = (out_dt - in_dt).days - free_days
+    return max(days, 0), free_days
 
 
 def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
@@ -147,7 +155,7 @@ def run_verification(filename: str, rows: list) -> dict:
         # 보관일수 계산
         odcy_in_date  = row.get("odcy_in_date")
         odcy_out_date = row.get("odcy_out_date")
-        storage_days  = _calc_storage_days(odcy_in_date, odcy_out_date, odcy_location)
+        storage_days, free_days = _calc_storage_days(odcy_in_date, odcy_out_date, odcy_location)
 
         result = {
             "id": result_id,
@@ -181,6 +189,7 @@ def run_verification(filename: str, rows: list) -> dict:
             "odcy_in_date": odcy_in_date,
             "odcy_out_date": odcy_out_date,
             "storage_days": storage_days,
+            "free_days": free_days,
         }
 
         # 티어번호 + 단가 조회 (TRKV 운송 구간 정보에 표시용)
