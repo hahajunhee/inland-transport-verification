@@ -22,6 +22,7 @@ COLUMN_MAP = {
     "도착지명":               "dest_name",
     "출하일":                 "transport_date",
     "Contrainer No.":         "container_no",
+    "C/Invoice No.":          "c_invoice_no",
     "Quantity":               "quantity",
     "Weekend / Holiday":      "weekend_holiday",
     "Mobis 운임합계(매출)":   "trkv_actual",
@@ -151,7 +152,7 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
         row["odcy_out_date"] = _parse_date(row.get("odcy_out_date"))
 
         # 코드/이름 strip
-        for field in ("pickup_code", "pickup_name", "odcy_code", "odcy_name", "odcy_destination_name", "dest_code", "dest_name", "container_no", "departure_name"):
+        for field in ("pickup_code", "pickup_name", "odcy_code", "odcy_name", "odcy_destination_name", "dest_code", "dest_name", "container_no", "c_invoice_no", "departure_name"):
             val = str(row.get(field) or "").strip()
             row[field] = val if val not in ("nan", "None", "") else None
 
@@ -185,14 +186,14 @@ STATUS_FILL = {
 # 컬럼 헤더 행 (Row 2): 연한 색 (웹 th-xxx 배경색)
 _SECTIONS = [
     # (start_col, end_col, label, group_bg, col_bg, col_font)
-    (1,   3,  "기본 정보",      "374151", "E5E7EB", "374151"),
-    (4,   15, "운송 구간 정보", "0F766E", "CCFBF1", "0F766E"),
-    (16,  20, "TRKV",           "1A73E8", "E8F0FE", "1A73E8"),
-    (21,  31, "구분값 정보",    "6B21A8", "F3E8FF", "6B21A8"),
-    (32,  36, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
-    (37,  40, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
-    (41,  44, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
-    (45,  45, "종합",           "374151", "E5E7EB", "374151"),
+    (1,   4,  "기본 정보",      "374151", "E5E7EB", "374151"),
+    (5,   16, "운송 구간 정보", "0F766E", "CCFBF1", "0F766E"),
+    (17,  21, "TRKV",           "1A73E8", "E8F0FE", "1A73E8"),
+    (22,  32, "구분값 정보",    "6B21A8", "F3E8FF", "6B21A8"),
+    (33,  37, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
+    (38,  41, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
+    (42,  45, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
+    (46,  46, "종합",           "374151", "E5E7EB", "374151"),
 ]
 
 def _col_style(col_idx: int):
@@ -209,7 +210,7 @@ def generate_results_excel(results: list) -> bytes:
     ws.title = "정산검증결과"
 
     headers = [
-        "행번호", "컨테이너번호", "운송일자", "픽업지코드", "픽업지명",
+        "행번호", "컨테이너번호", "C/Invoice No.", "운송일자", "픽업지코드", "픽업지명",
         "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호", "TRKV요율#",
         # TRKV
         "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
@@ -249,25 +250,25 @@ def generate_results_excel(results: list) -> bytes:
 
     # ── Row 3: 출처 정보 행 ────────────────────────────────────────
     sources = [
-        # 기본 정보 (1-3)
-        "생성", "검증: Contrainer No.", "검증: 출하일",
-        # 운송 구간 정보 (4-15)
+        # 기본 정보 (1-4)
+        "생성", "검증: Contrainer No.", "검증: C/Invoice No.", "검증: 출하일",
+        # 운송 구간 정보 (5-16)
         "검증: 픽업지명", "요율표: PM-A", "검증: 출하지명", "요율표: DM-A",
         "검증: 상세ODCY", "검증: 도착지명", "요율표: PM-A",
         "검증: Cont.Category", "검증: Quantity", "검증: Weekend/Holiday", "요율표: 컨테이너티어", "요율표: TRKV구간",
-        # TRKV (16-20)
+        # TRKV (17-21)
         "요율표: TRKV구간", "검증: Mobis운임합계", "계산", "계산", "계산",
-        # 구분값 정보 (21-30)
+        # 구분값 정보 (22-32)
         "검증: ODCY도착지명", "검증: 도착지명",
         "요율표: OM-C", "요율표: OM-D", "요율표: PM-B", "요율표: PM-C",
         "검증: ODCY 반입일", "검증: ODCY 반출일", "계산", "계산", "요율표: 보관료",
-        # 보관료 (31-35)
+        # 보관료 (33-37)
         "요율표: 보관료", "검증: ODCY 보관료", "계산", "계산", "계산",
-        # 상하차료 (36-39)
+        # 상하차료 (38-41)
         "검증: ODCY 상하차료", "계산", "계산", "계산",
-        # 셔틀비용 (40-43)
+        # 셔틀비용 (42-45)
         "검증: ODCY 셔틀료", "계산", "계산", "계산",
-        # 종합 (44)
+        # 종합 (46)
         "계산",
     ]
     ws.append(sources)
@@ -283,7 +284,7 @@ def generate_results_excel(results: list) -> bytes:
     for r in results:
         g = (lambda k: r.get(k) if isinstance(r, dict) else getattr(r, k, None))
         row_data = [
-            g("row_number"), g("container_no"), g("transport_date"),
+            g("row_number"), g("container_no"), g("c_invoice_no"), g("transport_date"),
             g("pickup_code"), g("pickup_name"),
             g("odcy_code"), g("odcy_name"),
             g("dest_code"), g("dest_name"),

@@ -176,6 +176,7 @@ def run_verification(filename: str, rows: list) -> dict:
             "session_id": session_id,
             "row_number": row.get("row_number", 0),
             "container_no": row.get("container_no"),
+            "c_invoice_no": row.get("c_invoice_no"),
             "transport_date": row.get("transport_date"),
             "pickup_code": pickup_code,
             "pickup_name": pickup_name,
