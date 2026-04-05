@@ -76,7 +76,9 @@ def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, conta
                    odcy_name_resolved=None, odcy_terminal_type=None,
                    odcy_location=None, dest_port_type=None, dest_terminal_type=None,
                    storage_tier_number=None, storage_days=None):
+    """반환: (expected, diff, status, rate_row, unit_rate)"""
     rate_row = None
+    unit_rate = None  # 보관료 day당 단가
     if charge_type == "TRKV":
         expected = trkv_service.get_trkv_expected(
             pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity, weekend_holiday
@@ -94,9 +96,12 @@ def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, conta
         else:
             unit = rate.get("shuttle_unit")
 
+        if charge_type == "보관료":
+            unit_rate = unit  # day당 보관단가 기록
+
         if unit is not None:
             if charge_type == "보관료":
-                # 보관료: 단가 × 보관일수 × 수량
+                # 보관료: 단가 × FREE반영일수 × 수량
                 if storage_days is not None and storage_days >= 0:
                     expected = unit * storage_days * quantity
                 else:
@@ -112,11 +117,11 @@ def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, conta
 
     if expected is None:
         if actual == 0.0:
-            return None, None, "SKIP", rate_row
-        return None, None, "NO_RATE", rate_row
+            return None, None, "SKIP", rate_row, unit_rate
+        return None, None, "NO_RATE", rate_row, unit_rate
     diff = actual - expected
     status = "OK" if abs(diff) < TOLERANCE else "DIFF"
-    return expected, diff, status, rate_row
+    return expected, diff, status, rate_row, unit_rate
 
 
 def run_verification(filename: str, rows: list) -> dict:
@@ -233,8 +238,9 @@ def run_verification(filename: str, rows: list) -> dict:
                 diff = actual - expected
                 status = "OK" if abs(diff) < TOLERANCE else "DIFF"
                 rate_row = None
+                unit_rate = None
             else:
-                expected, diff, status, rate_row = _verify_charge(
+                expected, diff, status, rate_row, unit_rate = _verify_charge(
                     charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
                     pickup_name=pickup_name, departure_name=departure_name, dest_name=dest_name,
                     cont_type=cont_type, dg_raw=dg_raw, quantity=quantity,
@@ -254,6 +260,7 @@ def run_verification(filename: str, rows: list) -> dict:
             statuses.append(status)
             if charge_type == "보관료":
                 storage_rate_row = rate_row
+                result["storage_unit_rate"] = unit_rate
 
             prefix = prefix_map[charge_type]
             if status in ("OK", "SKIP"):

@@ -116,7 +116,7 @@
             <th colspan="12" class="th-group th-route collapsible-group" data-group="route" onclick="toggleGroup('route')"><span class="group-toggle">▾</span> 운송 구간 정보</th>
             <th colspan="5" class="th-group th-trkv collapsible-group" data-group="trkv" onclick="toggleGroup('trkv')"><span class="group-toggle">▾</span> TRKV</th>
             <th colspan="11" class="th-group th-info collapsible-group" data-group="info" onclick="toggleGroup('info')"><span class="group-toggle">▾</span> 구분값 정보</th>
-            <th colspan="5" class="th-group th-storage collapsible-group" data-group="storage" onclick="toggleGroup('storage')"><span class="group-toggle">▾</span> 보관료</th>
+            <th colspan="6" class="th-group th-storage collapsible-group" data-group="storage" onclick="toggleGroup('storage')"><span class="group-toggle">▾</span> 보관료</th>
             <th colspan="4" class="th-group th-handling collapsible-group" data-group="handling" onclick="toggleGroup('handling')"><span class="group-toggle">▾</span> 상하차료</th>
             <th colspan="4" class="th-group th-shuttle collapsible-group" data-group="shuttle" onclick="toggleGroup('shuttle')"><span class="group-toggle">▾</span> 셔틀비용</th>
             <th rowspan="3" class="sortable-th" onclick="sortBy('overall_status')">종합 <span class="sort-arrow">↕</span></th>
@@ -154,8 +154,9 @@
             <th class="th-info cg-i sortable-th" onclick="sortBy('storage_days')">보관일수 <span class="sort-arrow">↕</span></th>
             <th class="th-info cg-i">FREE반영</th>
             <th class="th-info cg-i">보관요율#</th>
-            <!-- 보관료 5열 -->
+            <!-- 보관료 6열 -->
             <th class="th-storage cg-s">티어</th>
+            <th class="th-storage cg-s">단가(일)</th>
             <th class="th-storage cg-s">청구</th><th class="th-storage cg-s">예상</th><th class="th-storage cg-s">차이</th>
             <th class="th-storage cg-s sortable-th" onclick="sortBy('storage_status')">상태 <span class="sort-arrow">↕</span></th>
             <!-- 상하차료 4열 -->
@@ -198,7 +199,8 @@
             <th class="th-source th-info cg-i">계산</th>
             <th class="th-source th-info cg-i">계산</th>
             <th class="th-source th-info cg-i">요율표: 보관료</th>
-            <!-- 보관료 5열 -->
+            <!-- 보관료 6열 -->
+            <th class="th-source th-storage cg-s">요율표: 보관료</th>
             <th class="th-source th-storage cg-s">요율표: 보관료</th>
             <th class="th-source th-storage cg-s">검증: ODCY보관료</th>
             <th class="th-source th-storage cg-s">계산</th>
@@ -217,7 +219,7 @@
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="46" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
+          <tr><td colspan="47" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>

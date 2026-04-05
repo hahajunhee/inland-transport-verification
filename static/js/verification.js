@@ -4,7 +4,7 @@ let currentSessionId = null;
 let currentFilter = "ALL";
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
-const EMPTY_COLS = 46;     // colspan for empty message
+const EMPTY_COLS = 47;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -288,8 +288,9 @@ function renderRow(r) {
     <td class="td-info td-center cg-i">${storageDays}</td>
     <td class="td-center td-info cg-i">${r.billable_days != null ? (r.free_days > 0 ? `<span style="color:#dc2626;font-weight:700">${r.billable_days}</span>` : `<span style="color:#9ca3af">${r.billable_days}</span>`) : '-'}</td>
     <td class="td-center cg-i">${r.storage_rate_row != null ? `<span class="ref-badge ref-storage" title="보관료_상하차료_셔틀비 요율 시트 ${r.storage_rate_row}행">보관요율 #${r.storage_rate_row}</span>` : '-'}</td>
-    <!-- 보관료 (5열: 티어 + 청구 + 예상 + 차이 + 상태) -->
+    <!-- 보관료 (6열: 티어 + 단가 + 청구 + 예상 + 차이 + 상태) -->
     <td class="td-tier cg-s">${storageTierBadge}</td>
+    <td class="money cg-s">${r.storage_unit_rate != null ? fmtMoney(r.storage_unit_rate) : '-'}</td>
     ${chargeCell(r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status, 'cg-s')}
     <!-- 상하차료 -->
     ${chargeCell(r.handling_actual, r.handling_expected, r.handling_diff, r.handling_status, 'cg-h')}
@@ -339,7 +340,7 @@ function showError(msg) {
 
 // ─── 접기/펼치기 그룹 ─────────────────────────────────────
 const groupColspans = {
-  route: 12, trkv: 5, info: 11, storage: 5, handling: 4, shuttle: 4,
+  route: 12, trkv: 5, info: 11, storage: 6, handling: 4, shuttle: 4,
 };
 const hiddenGroups = new Set();
 
