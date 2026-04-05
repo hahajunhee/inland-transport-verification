@@ -108,7 +108,8 @@ function renderSrRowHtml(d, i, editing) {
       </td>
     </tr>`;
   }
-  return `<tr id="sr-row-${d.id}">
+  const autoStyle = d.auto_generated ? ' style="background:#fffde7"' : '';
+  return `<tr id="sr-row-${d.id}"${autoStyle}>
     <td><input type="checkbox" class="sr-chk" data-id="${d.id}" onchange="updateSrSelCount()" /></td>
     <td>${i+1}</td>
     <td>${d.odcy_name||'<span style="color:#9ca3af">-</span>'}</td>

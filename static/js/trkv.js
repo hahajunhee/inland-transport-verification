@@ -205,8 +205,9 @@ function renderRoutes() {
 function renderRoutesViewMode(tbody) {
   tbody.innerHTML = rtData.map((r, i) => {
     const changed = changedRtIds.has(r.id) ? " row-changed" : "";
+    const autoGen = r.auto_generated ? ' style="background:#fffde7"' : "";
     return `
-    <tr class="${changed}">
+    <tr class="${changed}"${autoGen}>
       <td><input type="checkbox" class="rt-chk" data-id="${r.id}" onchange="updateRtSelCount()" /></td>
       <td>${i + 1}</td>
       <td>${portBadge(r.pickup_port)}</td>

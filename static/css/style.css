@@ -130,6 +130,8 @@ a:hover { text-decoration: underline; }
 .btn-sm { padding: 5px 12px; font-size: 12px; }
 .btn-diff { background: #fce8e6; color: #c62828; border: 1px solid #f5c6c6; }
 .btn-no-rate { background: #fff9e6; color: #856404; border: 1px solid #ffe083; }
+.btn-warning { background: #f59e0b; color: #fff; border: 1px solid #d97706; }
+.btn-warning:hover:not(:disabled) { background: #d97706; }
 
 /* ─── 테이블 ────────────────────────────────────────────── */
 .table-wrapper { overflow-x: auto; }

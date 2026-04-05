@@ -121,6 +121,32 @@ function renderSummary(s) {
   const diffEl = document.getElementById("s-total-diff");
   diffEl.textContent = fmtMoney(diff);
   diffEl.style.color = diff > 0 ? "#c62828" : "#1e7e34";
+
+  // NO_RATE 건이 있으면 일괄생성 버튼 표시
+  const hasNoRate = (s.trkv_no_rate || 0) + (s.storage_no_rate || 0) + (s.handling_no_rate || 0) + (s.shuttle_no_rate || 0) > 0;
+  const genBtn = document.getElementById("btn-gen-rates");
+  if (genBtn) genBtn.style.display = hasNoRate ? "" : "none";
+}
+
+async function generateMissingRates() {
+  if (!currentSessionId) return alert("세션을 선택하세요.");
+  if (!confirm("NO_RATE인 건에 대해 누락 요율을 자동 생성합니다.\n(티어1~6 모두 0원으로 생성)\n\n진행하시겠습니까?")) return;
+
+  const btn = document.getElementById("btn-gen-rates");
+  btn.disabled = true;
+  btn.textContent = "생성 중...";
+
+  try {
+    const res = await fetch(`/api/verification/sessions/${currentSessionId}/generate-missing-rates`, { method: "POST" });
+    if (!res.ok) { const e = await res.json(); alert(e.detail || "생성 실패"); return; }
+    const data = await res.json();
+    alert(`요율 생성 완료!\n\nTRKV 구간: ${data.trkv_created}건\n보관료/상하차료/셔틀비: ${data.storage_created}건\n\n생성된 요율의 단가는 모두 0원입니다.\n각 요율 페이지에서 실제 단가를 입력해주세요.`);
+  } catch (e) {
+    alert("오류: " + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "⚠ 누락요율 일괄생성";
+  }
 }
 
 // ─── 필터 ────────────────────────────────────────────────
@@ -246,7 +272,7 @@ function renderRow(r) {
     <td class="money cg-r">${qty}</td>
     <td class="td-center cg-r">${whCell}</td>
     <td class="td-tier cg-r">${tierBadge}</td>
-    <td class="td-center cg-r">${r.trkv_rate_row != null ? `<span class="ref-badge ref-trkv">#${r.trkv_rate_row}</span>` : '-'}</td>
+    <td class="td-center cg-r">${r.trkv_rate_row != null ? `<span class="ref-badge ref-trkv" title="TRKV구간요율 시트 ${r.trkv_rate_row}행">TRKV구간 #${r.trkv_rate_row}</span>` : '-'}</td>
     <!-- TRKV (5열: 단가 + 청구 + 예상 + 차이 + 상태) -->
     <td class="money trkv-unit cg-t">${unitRate}</td>
     ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status, 'cg-t')}
@@ -261,7 +287,7 @@ function renderRow(r) {
     <td class="td-info cg-i" style="font-size:11px">${fmtDateOnly(r.odcy_out_date)}</td>
     <td class="td-info td-center cg-i">${storageDays}</td>
     <td class="td-center td-info cg-i">${r.billable_days != null ? (r.free_days > 0 ? `<span style="color:#dc2626;font-weight:700">${r.billable_days}</span>` : `<span style="color:#9ca3af">${r.billable_days}</span>`) : '-'}</td>
-    <td class="td-center cg-i">${r.storage_rate_row != null ? `<span class="ref-badge ref-storage">#${r.storage_rate_row}</span>` : '-'}</td>
+    <td class="td-center cg-i">${r.storage_rate_row != null ? `<span class="ref-badge ref-storage" title="보관료_상하차료_셔틀비 요율 시트 ${r.storage_rate_row}행">보관요율 #${r.storage_rate_row}</span>` : '-'}</td>
     <!-- 보관료 (5열: 티어 + 청구 + 예상 + 차이 + 상태) -->
     <td class="td-tier cg-s">${storageTierBadge}</td>
     ${chargeCell(r.storage_actual, r.storage_expected, r.storage_diff, r.storage_status, 'cg-s')}
