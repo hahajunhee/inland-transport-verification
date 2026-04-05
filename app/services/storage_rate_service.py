@@ -59,10 +59,19 @@ def find_storage_rate(
             break
 
     t = tier_number if isinstance(tier_number, int) and tier_number in TIERS else 1
+
+    # 티어별 필드 (storage_tier1) 우선, fallback으로 단일 단가 필드 (storage_unit)
+    def _get_unit(prefix):
+        val = best.get(f"{prefix}_tier{t}")
+        if val is not None:
+            return val
+        # fallback: 구버전 단일 단가 필드
+        return best.get(f"{prefix}_unit")
+
     return {
-        "storage_unit":  best.get(f"storage_tier{t}"),
-        "handling_unit": best.get(f"handling_tier{t}"),
-        "shuttle_unit":  best.get(f"shuttle_tier{t}"),
+        "storage_unit":  _get_unit("storage"),
+        "handling_unit": _get_unit("handling"),
+        "shuttle_unit":  _get_unit("shuttle"),
         "rate_row_num":  rate_row_num,
     }
 
