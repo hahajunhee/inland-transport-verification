@@ -1,5 +1,8 @@
 # 데이터 파일 (요율·검증 데이터 포함 — 깃에 올리지 않음)
 data/*.json
+data/*.db
+data/*.db-wal
+data/*.db-shm
 data/results/
 
 # Python 캐시

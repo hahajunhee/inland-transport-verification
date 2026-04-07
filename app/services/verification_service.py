@@ -51,8 +51,9 @@ def _get_free_days(odcy_location: str) -> int:
 def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) -> tuple[int | None, int | None, int]:
     """보관일수 계산. 반환: (raw_days, billable_days, free_days)
     - raw_days: 반출일 - 반입일 + 1 (순수 보관일수, 표시용)
-    - billable_days: raw_days - free_days (보관료 계산용)
-    - free_days: FREE 적용 일수 (4일 이상일 때만 적용)
+    - billable_days: max(raw_days - free_days, 0) (보관료 계산용)
+    - free_days: FREE 적용 일수 (ODCY위치가 KRPUSN/부산신항이면 3일 차감)
+    보관료 = 단가(일) × billable_days × quantity
     """
     in_dt = _parse_date_value(odcy_in_date_str)
     out_dt = _parse_date_value(odcy_out_date_str)
@@ -60,11 +61,10 @@ def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) 
         return None, None, 0
     raw_days = (out_dt - in_dt).days + 1  # 순수 보관일수
 
-    # FREE 적용: 해당 위치이고 보관일수 4일 이상일 때만
+    # FREE 적용: ODCY위치가 KRPUSN/부산신항이면 무조건 3일 차감 (최소 0)
     free_days = 0
     if odcy_location and odcy_location.strip() in FREE_TIME_LOCATIONS:
-        if raw_days >= 4:
-            free_days = FREE_TIME_DAYS
+        free_days = FREE_TIME_DAYS
 
     billable_days = max(raw_days - free_days, 0)
     return raw_days, billable_days, free_days

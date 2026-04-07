@@ -415,7 +415,7 @@ def get_trkv_details(
     routes = data_store.load("trkv_routes.json")
     route_row_num = None
     route = None
-    for idx, r in enumerate(routes, 1):
+    for idx, r in enumerate(routes, 2):  # 헤더 1행 → 데이터는 2행부터
         if (r.get("pickup_port") == pickup_port
             and r.get("departure_code", r.get("departure_name", "")) == dep
             and r.get("dest_port") == dest_port):

@@ -135,7 +135,7 @@
             <th class="th-route cg-r sortable-th" onclick="sortBy('quantity')">수량 <span class="sort-arrow">↕</span></th>
             <th class="th-route cg-r sortable-th" onclick="sortBy('weekend_holiday')">주말/휴일 <span class="sort-arrow">↕</span></th>
             <th class="th-route cg-r sortable-th" onclick="sortBy('tier_number')">티어 <span class="sort-arrow">↕</span></th>
-            <th class="th-route cg-r">TRKV요율#</th>
+            <th class="th-route cg-r">TRKV요율# <span class="help-tip" title="픽업포트(PM-A) + 출하지코드(DM-A) + 도착포트(PM-A) 3개 키로 TRKV구간요율 테이블에서 매칭된 행번호입니다.&#10;해당 행의 티어(T1~T6) 단가를 사용합니다.">❓</span></th>
             <!-- TRKV 5열 -->
             <th class="th-trkv cg-t sortable-th" onclick="sortBy('trkv_unit_rate')">단가 <span class="sort-arrow">↕</span></th>
             <th class="th-trkv cg-t sortable-th" onclick="sortBy('trkv_actual')">청구 <span class="sort-arrow">↕</span></th>
@@ -153,7 +153,7 @@
             <th class="th-info cg-i sortable-th" onclick="sortBy('odcy_out_date')">반출일 <span class="sort-arrow">↕</span></th>
             <th class="th-info cg-i sortable-th" onclick="sortBy('storage_days')">보관일수 <span class="sort-arrow">↕</span></th>
             <th class="th-info cg-i">FREE반영</th>
-            <th class="th-info cg-i">보관요율#</th>
+            <th class="th-info cg-i">보관요율# <span class="help-tip" title="ODCY명(OM-B) + odcy터미널구분(OM-C) + ODCY_위치(OM-D) + 도착지포트구분(PM-B) + 도착지터미널구분(PM-C) 5개 키로 보관료요율 테이블에서 매칭된 행번호입니다.&#10;해당 행의 보관료/상하차료/셔틀비 단가를 사용합니다.">❓</span></th>
             <!-- 보관료 6열 -->
             <th class="th-storage cg-s">티어</th>
             <th class="th-storage cg-s">단가(일)</th>
@@ -268,6 +268,10 @@
 .ref-badge { display:inline-block; padding:1px 6px; border-radius:8px; font-size:11px; font-weight:700; }
 .ref-trkv { background:#e0f2fe; color:#0369a1; }
 .ref-storage { background:#f3e8ff; color:#7c3aed; }
+
+/* ─── 도움말 툴팁 아이콘 ─── */
+.help-tip { cursor:help; font-size:12px; opacity:0.7; }
+.help-tip:hover { opacity:1; }
 
 .result-count {
   margin-top: 8px;
