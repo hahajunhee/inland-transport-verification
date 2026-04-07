@@ -10,9 +10,8 @@ from app.routers import rates, verification, pages, trkv, backup, storage_rates
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # data/ 및 data/results/ 디렉토리 자동 생성
-    data_store.DATA_DIR.mkdir(exist_ok=True)
-    data_store.RESULTS_DIR.mkdir(exist_ok=True)
+    # data/ 디렉토리 및 SQLite DB 초기화
+    data_store.init_db()
     yield
 
 
