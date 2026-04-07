@@ -138,7 +138,7 @@ _SCHEMAS = {
         "total_diff REAL DEFAULT 0",
     ],
     "verification_results": [
-        "id INTEGER PRIMARY KEY",
+        "id INTEGER PRIMARY KEY AUTOINCREMENT",
         "session_id INTEGER NOT NULL",
         "data_json TEXT NOT NULL",
     ],
@@ -260,10 +260,9 @@ def save_results(session_id: int, results: list):
         conn = _get_conn()
         conn.execute("DELETE FROM verification_results WHERE session_id = ?", (session_id,))
         for item in results:
-            item_id = item.get("id", 0)
             conn.execute(
-                "INSERT INTO verification_results (id, session_id, data_json) VALUES (?, ?, ?)",
-                (item_id, session_id, json.dumps(item, ensure_ascii=False, default=str)),
+                "INSERT INTO verification_results (session_id, data_json) VALUES (?, ?)",
+                (session_id, json.dumps(item, ensure_ascii=False, default=str)),
             )
         conn.commit()
 

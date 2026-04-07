@@ -43,7 +43,11 @@ def migrate():
     print(f"DB 경로: {data_store.DB_PATH}")
     print("=" * 50)
 
-    # 1. 테이블 초기화
+    # 1. 기존 테이블 삭제 후 재생성 (스키마 변경 대응)
+    conn = data_store._get_conn()
+    for table_name in data_store._SCHEMAS:
+        conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+    conn.commit()
     data_store.init_db()
     print("✓ 테이블 생성 완료")
 
