@@ -48,11 +48,15 @@ def _get_free_days(odcy_location: str) -> int:
         return FREE_TIME_DAYS
     return 0
 
-def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) -> tuple[int | None, int | None, int]:
+FREE_TIER_NUMBERS = {1, 2}  # FREE 적용 대상 보관료 티어
+
+def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str,
+                       storage_tier_number: int | None = None) -> tuple[int | None, int | None, int]:
     """보관일수 계산. 반환: (raw_days, billable_days, free_days)
     - raw_days: 반출일 - 반입일 + 1 (순수 보관일수, 표시용)
     - billable_days: max(raw_days - free_days, 0) (보관료 계산용)
-    - free_days: FREE 적용 일수 (ODCY위치가 KRPUSN/부산신항이면 3일 차감)
+    - free_days: FREE 적용 일수
+    FREE 조건: ODCY위치가 KRPUSN/부산신항 AND 보관료티어가 T1 또는 T2
     보관료 = 단가(일) × billable_days × quantity
     """
     in_dt = _parse_date_value(odcy_in_date_str)
@@ -61,9 +65,10 @@ def _calc_storage_days(odcy_in_date_str, odcy_out_date_str, odcy_location: str) 
         return None, None, 0
     raw_days = (out_dt - in_dt).days + 1  # 순수 보관일수
 
-    # FREE 적용: ODCY위치가 KRPUSN/부산신항이면 무조건 3일 차감 (최소 0)
+    # FREE 적용: ODCY위치가 KRPUSN/부산신항 AND 티어 T1/T2일 때만 3일 차감
     free_days = 0
-    if odcy_location and odcy_location.strip() in FREE_TIME_LOCATIONS:
+    if (odcy_location and odcy_location.strip() in FREE_TIME_LOCATIONS
+            and storage_tier_number in FREE_TIER_NUMBERS):
         free_days = FREE_TIME_DAYS
 
     billable_days = max(raw_days - free_days, 0)
@@ -174,7 +179,7 @@ def run_verification(filename: str, rows: list) -> dict:
         # 보관일수 계산
         odcy_in_date  = row.get("odcy_in_date")
         odcy_out_date = row.get("odcy_out_date")
-        raw_days, billable_days, free_days = _calc_storage_days(odcy_in_date, odcy_out_date, odcy_location)
+        raw_days, billable_days, free_days = _calc_storage_days(odcy_in_date, odcy_out_date, odcy_location, storage_tier_number)
 
         result = {
             "id": result_id,
