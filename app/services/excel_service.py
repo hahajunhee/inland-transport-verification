@@ -346,33 +346,42 @@ _FWO_HEADERS = [
 ]
 
 
+FILL_NEGATIVE = PatternFill("solid", fgColor="FFFF00")  # 노란 음영 (음수 행)
+
+
 def generate_fwo_charge_excel(results: list) -> bytes:
     """DIFF 행을 FWO Charge 템플릿으로 변환한 엑셀 생성."""
     wb = Workbook()
     ws = wb.active
     ws.title = "FWO Charge"
 
-    # ── 헤더 행 (9행에 해당) ──
-    header_fill = PatternFill("solid", fgColor="FFC000")  # 오렌지/노란색
+    HEADER_ROW = 9  # 헤더는 9행
+
+    # ── 1~8행: 빈 행 ──
+    for _ in range(HEADER_ROW - 1):
+        ws.append([])
+
+    # ── 9행: 헤더 ──
+    header_fill = PatternFill("solid", fgColor="FFC000")
     header_font = Font(bold=True, size=10)
     header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     ws.append(_FWO_HEADERS)
-    for cell in ws[1]:
+    for cell in ws[HEADER_ROW]:
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = header_align
-    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[HEADER_ROW].height = 30
 
     # 컬럼 너비
-    col_widths = [16, 12, 18, 18, 12, 14, 10, 14, 10, 18, 14, 10, 12, 16, 14, 14]
+    col_widths = [16, 12, 18, 18, 12, 14, 10, 14, 10, 18, 14, 10, 12, 16, 14, 20]
     for i, w in enumerate(col_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     data_align = Alignment(vertical="center")
     money_fmt = '#,##0'
 
-    # ── DIFF 행 → 운임항목별 행 생성 ──
+    # ── DIFF 행 → 운임항목별 행 생성 (10행부터) ──
     charge_keys = [
         ("trkv",     "trkv_status",    "trkv_diff"),
         ("storage",  "storage_status", "storage_diff"),
@@ -398,6 +407,8 @@ def generate_fwo_charge_excel(results: list) -> bytes:
             charge_type = _CHARGE_TYPE_MAP[prefix]
             rate_amount = diff_val
             tax_amount = round(rate_amount * 0.1)
+            is_negative = rate_amount < 0
+            reason_detail = "음수 금액 - 매출인보이스 엑셀 업로드 시 해당 행 삭제 필요" if is_negative else ""
 
             row_data = [
                 fwo_no,                 # A: FWO No.
@@ -415,7 +426,7 @@ def generate_fwo_charge_excel(results: list) -> bytes:
                 tax_amount,             # M: Tax Amount (H × 0.1)
                 "",                     # N: 청구통화 KRW for Billing
                 "CH01",                 # O: Reason Code (고정)
-                "",                     # P: Reason Detail
+                reason_detail,          # P: Reason Detail
             ]
             ws.append(row_data)
             excel_row = ws.max_row
@@ -425,6 +436,9 @@ def generate_fwo_charge_excel(results: list) -> bytes:
                 cell.font = Font(size=10)
                 if col_idx in (8, 11, 13):  # H, K, M: 금액 포맷
                     cell.number_format = money_fmt
+                # 음수 행: 노란 음영
+                if is_negative:
+                    cell.fill = FILL_NEGATIVE
 
     buf = BytesIO()
     wb.save(buf)
