@@ -124,7 +124,7 @@ def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, conta
         if actual == 0.0:
             return None, None, "SKIP", rate_row, unit_rate
         return None, None, "NO_RATE", rate_row, unit_rate
-    diff = actual - expected
+    diff = expected - actual
     status = "OK" if abs(diff) < TOLERANCE else "DIFF"
     return expected, diff, status, rate_row, unit_rate
 
@@ -186,6 +186,7 @@ def run_verification(filename: str, rows: list) -> dict:
             "session_id": session_id,
             "row_number": row.get("row_number", 0),
             "container_no": row.get("container_no"),
+            "fwo_doc": row.get("fwo_doc"),
             "c_invoice_no": row.get("c_invoice_no"),
             "transport_date": row.get("transport_date"),
             "pickup_code": pickup_code,
@@ -240,7 +241,7 @@ def run_verification(filename: str, rows: list) -> dict:
             # 직반입건: 보관료/상하차료/셔틀비용은 0원이 정상
             if is_direct_delivery and charge_type in ("보관료", "상하차료", "셔틀비용"):
                 expected = 0.0
-                diff = actual - expected
+                diff = expected - actual
                 status = "OK" if abs(diff) < TOLERANCE else "DIFF"
                 rate_row = None
                 unit_rate = None

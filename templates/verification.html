@@ -100,6 +100,7 @@
         <button class="btn btn-sm btn-no-rate filter-btn" data-filter="NO_RATE" onclick="setFilter('NO_RATE', this)">NO_RATE만</button>
         <button class="btn btn-sm btn-diff filter-btn" data-filter="DIFF_OR_NO_RATE" onclick="setFilter('DIFF_OR_NO_RATE', this)">이상있음</button>
         <button class="btn btn-sm btn-primary" onclick="exportExcel()">엑셀 다운로드</button>
+        <button class="btn btn-sm btn-fwo" id="btn-fwo-charge" onclick="exportFwoCharge()" style="display:none">📋 매출인보이스(차지) 생성</button>
         <button class="btn btn-sm btn-warning" id="btn-gen-rates" onclick="generateMissingRates()" style="display:none">⚠ 누락요율 일괄생성</button>
       </div>
     </div>
@@ -111,6 +112,7 @@
           <tr>
             <th rowspan="3" class="sortable-th" onclick="sortBy('row_number')">행# <span class="sort-arrow">↕</span></th>
             <th rowspan="3" class="sortable-th" onclick="sortBy('container_no')">컨테이너번호 <span class="sort-arrow">↕</span></th>
+            <th rowspan="3" class="sortable-th" onclick="sortBy('fwo_doc')">FWO Doc. <span class="sort-arrow">↕</span></th>
             <th rowspan="3" class="sortable-th" onclick="sortBy('c_invoice_no')">C/Invoice No. <span class="sort-arrow">↕</span></th>
             <th rowspan="3" class="sortable-th" onclick="sortBy('transport_date')">운송일자 <span class="sort-arrow">↕</span></th>
             <th colspan="12" class="th-group th-route collapsible-group" data-group="route" onclick="toggleGroup('route')"><span class="group-toggle">▾</span> 운송 구간 정보</th>

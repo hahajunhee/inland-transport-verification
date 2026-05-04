@@ -6,7 +6,7 @@ from io import BytesIO
 from urllib.parse import quote
 
 from app import data_store
-from app.services.excel_service import parse_settlement_excel, generate_results_excel
+from app.services.excel_service import parse_settlement_excel, generate_results_excel, generate_fwo_charge_excel
 from app.services.verification_service import run_verification
 from app.services.trkv_service import resolve_port, resolve_departure
 from app.services.storage_rate_service import find_storage_rate
@@ -76,6 +76,25 @@ def export_results(session_id: int):
     results = sorted(results, key=lambda x: x.get("row_number", 0))
     excel_bytes = generate_results_excel(results)
     filename = f"검증결과_{session_id}.xlsx"
+    return StreamingResponse(
+        BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
+@router.get("/sessions/{session_id}/export-fwo-charge")
+def export_fwo_charge(session_id: int):
+    """DIFF 행을 FWO Charge 템플릿으로 변환한 엑셀 다운로드."""
+    sessions = data_store.load("verification_sessions.json")
+    session = next((x for x in sessions if x["id"] == session_id), None)
+    if not session:
+        raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+    results = data_store.load_results(session_id)
+    results = sorted(results, key=lambda x: x.get("row_number", 0))
+    excel_bytes = generate_fwo_charge_excel(results)
+    now_str = datetime.now().strftime("%Y%m%d%H%M%S")
+    filename = f"결과-매출인보이스생성(차지)_{now_str}.xlsx"
     return StreamingResponse(
         BytesIO(excel_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

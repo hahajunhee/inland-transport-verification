@@ -132,6 +132,8 @@ a:hover { text-decoration: underline; }
 .btn-no-rate { background: #fff9e6; color: #856404; border: 1px solid #ffe083; }
 .btn-warning { background: #f59e0b; color: #fff; border: 1px solid #d97706; }
 .btn-warning:hover:not(:disabled) { background: #d97706; }
+.btn-fwo { background: #059669; color: #fff; border: 1px solid #047857; }
+.btn-fwo:hover:not(:disabled) { background: #047857; }
 
 /* ─── 테이블 ────────────────────────────────────────────── */
 .table-wrapper { overflow-x: auto; }

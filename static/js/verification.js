@@ -4,7 +4,7 @@ let currentSessionId = null;
 let currentFilter = "ALL";
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
-const EMPTY_COLS = 47;     // colspan for empty message
+const EMPTY_COLS = 48;     // colspan for empty message
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -126,6 +126,16 @@ function renderSummary(s) {
   const hasNoRate = (s.trkv_no_rate || 0) + (s.storage_no_rate || 0) + (s.handling_no_rate || 0) + (s.shuttle_no_rate || 0) > 0;
   const genBtn = document.getElementById("btn-gen-rates");
   if (genBtn) genBtn.style.display = hasNoRate ? "" : "none";
+
+  // DIFF 건이 있으면 FWO Charge 내보내기 버튼 표시
+  const hasDiff = (s.trkv_fail || 0) + (s.storage_fail || 0) + (s.handling_fail || 0) + (s.shuttle_fail || 0) > 0;
+  const fwoBtn = document.getElementById("btn-fwo-charge");
+  if (fwoBtn) fwoBtn.style.display = hasDiff ? "" : "none";
+}
+
+function exportFwoCharge() {
+  if (!currentSessionId) return alert("세션을 선택하세요.");
+  window.open(`/api/verification/sessions/${currentSessionId}/export-fwo-charge`, "_blank");
 }
 
 async function generateMissingRates() {
@@ -258,6 +268,7 @@ function renderRow(r) {
   return `<tr class="${rowClass}">
     <td>${r.row_number}</td>
     <td>${r.container_no || "-"}</td>
+    <td>${r.fwo_doc || "-"}</td>
     <td>${r.c_invoice_no || "-"}</td>
     <td>${r.transport_date || "-"}</td>
     <!-- 운송 구간 정보 (12열) -->

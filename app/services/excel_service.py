@@ -23,6 +23,7 @@ COLUMN_MAP = {
     "출하일":                 "transport_date",
     "Contrainer No.":         "container_no",
     "C/Invoice No.":          "c_invoice_no",
+    "FWO Doc.":               "fwo_doc",
     "Quantity":               "quantity",
     "Weekend / Holiday":      "weekend_holiday",
     "Mobis 운임합계(매출)":   "trkv_actual",
@@ -152,7 +153,7 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
         row["odcy_out_date"] = _parse_date(row.get("odcy_out_date"))
 
         # 코드/이름 strip
-        for field in ("pickup_code", "pickup_name", "odcy_code", "odcy_name", "odcy_destination_name", "dest_code", "dest_name", "container_no", "c_invoice_no", "departure_name"):
+        for field in ("pickup_code", "pickup_name", "odcy_code", "odcy_name", "odcy_destination_name", "dest_code", "dest_name", "container_no", "c_invoice_no", "fwo_doc", "departure_name"):
             val = str(row.get(field) or "").strip()
             row[field] = val if val not in ("nan", "None", "") else None
 
@@ -186,14 +187,14 @@ STATUS_FILL = {
 # 컬럼 헤더 행 (Row 2): 연한 색 (웹 th-xxx 배경색)
 _SECTIONS = [
     # (start_col, end_col, label, group_bg, col_bg, col_font)
-    (1,   4,  "기본 정보",      "374151", "E5E7EB", "374151"),
-    (5,   16, "운송 구간 정보", "0F766E", "CCFBF1", "0F766E"),
-    (17,  21, "TRKV",           "1A73E8", "E8F0FE", "1A73E8"),
-    (22,  32, "구분값 정보",    "6B21A8", "F3E8FF", "6B21A8"),
-    (33,  38, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
-    (39,  42, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
-    (43,  46, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
-    (47,  47, "종합",           "374151", "E5E7EB", "374151"),
+    (1,   5,  "기본 정보",      "374151", "E5E7EB", "374151"),
+    (6,   17, "운송 구간 정보", "0F766E", "CCFBF1", "0F766E"),
+    (18,  22, "TRKV",           "1A73E8", "E8F0FE", "1A73E8"),
+    (23,  33, "구분값 정보",    "6B21A8", "F3E8FF", "6B21A8"),
+    (34,  39, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
+    (40,  43, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
+    (44,  47, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
+    (48,  48, "종합",           "374151", "E5E7EB", "374151"),
 ]
 
 def _col_style(col_idx: int):
@@ -210,7 +211,7 @@ def generate_results_excel(results: list) -> bytes:
     ws.title = "정산검증결과"
 
     headers = [
-        "행번호", "컨테이너번호", "C/Invoice No.", "운송일자", "픽업지코드", "픽업지명",
+        "행번호", "컨테이너번호", "FWO Doc.", "C/Invoice No.", "운송일자", "픽업지코드", "픽업지명",
         "ODCY코드", "ODCY명", "도착지코드", "도착지명", "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호", "TRKV요율#",
         # TRKV
         "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
@@ -250,8 +251,8 @@ def generate_results_excel(results: list) -> bytes:
 
     # ── Row 3: 출처 정보 행 ────────────────────────────────────────
     sources = [
-        # 기본 정보 (1-4)
-        "생성", "검증: Contrainer No.", "검증: C/Invoice No.", "검증: 출하일",
+        # 기본 정보 (1-5)
+        "생성", "검증: Contrainer No.", "검증: FWO Doc.", "검증: C/Invoice No.", "검증: 출하일",
         # 운송 구간 정보 (5-16)
         "검증: 픽업지명", "요율표: PM-A", "검증: 출하지명", "요율표: DM-A",
         "검증: 상세ODCY", "검증: 도착지명", "요율표: PM-A",
@@ -284,7 +285,7 @@ def generate_results_excel(results: list) -> bytes:
     for r in results:
         g = (lambda k: r.get(k) if isinstance(r, dict) else getattr(r, k, None))
         row_data = [
-            g("row_number"), g("container_no"), g("c_invoice_no"), g("transport_date"),
+            g("row_number"), g("container_no"), g("fwo_doc"), g("c_invoice_no"), g("transport_date"),
             g("pickup_code"), g("pickup_name"),
             g("odcy_code"), g("odcy_name"),
             g("dest_code"), g("dest_name"),
@@ -293,7 +294,7 @@ def generate_results_excel(results: list) -> bytes:
             # 구분값 정보
             g("odcy_destination_name"), g("dest_name"),
             g("odcy_terminal_type"), g("odcy_location"), g("dest_port_type"), g("dest_terminal_type"),
-            g("odcy_in_date"), g("odcy_out_date"), g("storage_days"), g("free_days"), g("storage_rate_row"),
+            g("odcy_in_date"), g("odcy_out_date"), g("storage_days"), g("billable_days"), g("storage_rate_row"),
             # 보관료
             g("storage_tier_number"), g("storage_unit_rate"), g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
             g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),
@@ -320,6 +321,110 @@ def generate_results_excel(results: list) -> bytes:
 
     # 행 고정 (헤더 2행 고정)
     ws.freeze_panes = "A4"
+
+    buf = BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+# ─── FWO Charge 엑셀 생성 (DIFF → 매출인보이스 변환) ─────────────
+
+# DIFF 발생 운임항목 → Charge Type 매핑
+_CHARGE_TYPE_MAP = {
+    "trkv":     "TRKV",
+    "storage":  "STWV",
+    "handling": "LULV",
+    "shuttle":  "SHTV",
+}
+
+_FWO_HEADERS = [
+    "FWO No.", "B/L No.", "Traffic Direction", "Container No.",
+    "Stage Type", "Charge Type", "Currency", "Rate Amount",
+    "Quantity", "Rounding Profile", "Calc. Amount",
+    "Tax Code", "Tax Amount",
+    "청구통화\nKRW for Billing", "Reason Code", "Reason Detail",
+]
+
+
+def generate_fwo_charge_excel(results: list) -> bytes:
+    """DIFF 행을 FWO Charge 템플릿으로 변환한 엑셀 생성."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "FWO Charge"
+
+    # ── 헤더 행 (9행에 해당) ──
+    header_fill = PatternFill("solid", fgColor="FFC000")  # 오렌지/노란색
+    header_font = Font(bold=True, size=10)
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    ws.append(_FWO_HEADERS)
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_align
+    ws.row_dimensions[1].height = 30
+
+    # 컬럼 너비
+    col_widths = [16, 12, 18, 18, 12, 14, 10, 14, 10, 18, 14, 10, 12, 16, 14, 14]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    data_align = Alignment(vertical="center")
+    money_fmt = '#,##0'
+
+    # ── DIFF 행 → 운임항목별 행 생성 ──
+    charge_keys = [
+        ("trkv",     "trkv_status",    "trkv_diff"),
+        ("storage",  "storage_status", "storage_diff"),
+        ("handling", "handling_status", "handling_diff"),
+        ("shuttle",  "shuttle_status", "shuttle_diff"),
+    ]
+
+    for r in results:
+        if r.get("overall_status") != "DIFF":
+            continue
+
+        fwo_no = r.get("fwo_doc") or ""
+        container_no = r.get("container_no") or ""
+
+        for prefix, status_key, diff_key in charge_keys:
+            if r.get(status_key) != "DIFF":
+                continue
+
+            diff_val = r.get(diff_key) or 0
+            if abs(diff_val) < 1:
+                continue
+
+            charge_type = _CHARGE_TYPE_MAP[prefix]
+            rate_amount = diff_val
+            tax_amount = round(rate_amount * 0.1)
+
+            row_data = [
+                fwo_no,                 # A: FWO No.
+                "",                     # B: B/L No. (빈값)
+                1,                      # C: Traffic Direction (고정 1)
+                container_no,           # D: Container No.
+                "P",                    # E: Stage Type (고정 P)
+                charge_type,            # F: Charge Type
+                "KRW",                  # G: Currency (고정)
+                rate_amount,            # H: Rate Amount (차이금액)
+                "",                     # I: Quantity
+                "",                     # J: Rounding Profile
+                rate_amount,            # K: Calc. Amount (= H와 동일)
+                "T1",                   # L: Tax Code (고정 T1)
+                tax_amount,             # M: Tax Amount (H × 0.1)
+                "",                     # N: 청구통화 KRW for Billing
+                "CH01",                 # O: Reason Code (고정)
+                "",                     # P: Reason Detail
+            ]
+            ws.append(row_data)
+            excel_row = ws.max_row
+            for col_idx in range(1, len(row_data) + 1):
+                cell = ws.cell(row=excel_row, column=col_idx)
+                cell.alignment = data_align
+                cell.font = Font(size=10)
+                if col_idx in (8, 11, 13):  # H, K, M: 금액 포맷
+                    cell.number_format = money_fmt
 
     buf = BytesIO()
     wb.save(buf)
