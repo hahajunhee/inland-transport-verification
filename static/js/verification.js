@@ -127,10 +127,6 @@ function renderSummary(s) {
   const genBtn = document.getElementById("btn-gen-rates");
   if (genBtn) genBtn.style.display = hasNoRate ? "" : "none";
 
-  // DIFF 건이 있으면 FWO Charge 내보내기 버튼 표시
-  const hasDiff = (s.trkv_fail || 0) + (s.storage_fail || 0) + (s.handling_fail || 0) + (s.shuttle_fail || 0) > 0;
-  const fwoBtn = document.getElementById("btn-fwo-charge");
-  if (fwoBtn) fwoBtn.style.display = hasDiff ? "" : "none";
 }
 
 function exportFwoCharge() {
