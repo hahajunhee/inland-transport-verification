@@ -357,9 +357,9 @@ def generate_fwo_charge_excel(results: list) -> bytes:
 
     HEADER_ROW = 9  # 헤더는 9행
 
-    # ── 1~8행: 빈 행 ──
+    # ── 1~8행: A열에 1 입력 ──
     for _ in range(HEADER_ROW - 1):
-        ws.append([])
+        ws.append([1])
 
     # ── 9행: 헤더 ──
     header_fill = PatternFill("solid", fgColor="FFC000")
