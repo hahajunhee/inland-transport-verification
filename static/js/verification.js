@@ -131,7 +131,7 @@ function renderSummary(s) {
 
 function exportFwoCharge() {
   if (!currentSessionId) return alert("세션을 선택하세요.");
-  window.open(`/api/verification/sessions/${currentSessionId}/export-fwo-charge`, "_blank");
+  location.href = `/api/verification/sessions/${currentSessionId}/export-fwo-charge`;
 }
 
 async function generateMissingRates() {
