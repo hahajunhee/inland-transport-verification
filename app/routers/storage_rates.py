@@ -131,7 +131,10 @@ async def upload_storage_rates(file: UploadFile = File(...)):
     header = [cell.value for cell in ws[1]]
     col_map = {str(v).strip(): i for i, v in enumerate(header) if v is not None}
 
-    if "보관료 단가" not in col_map and "상하차료 단가" not in col_map:
+    # 헤더에 [OM-X] 등 접미사가 붙어있을 수 있으므로 부분 매칭으로 검증
+    has_storage  = any("보관료 단가" in h for h in col_map)
+    has_handling = any("상하차료 단가" in h for h in col_map)
+    if not has_storage and not has_handling:
         raise HTTPException(400, detail="헤더에 '보관료 단가' 또는 '상하차료 단가' 컬럼이 없습니다.")
 
     def to_float(v):
