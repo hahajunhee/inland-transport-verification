@@ -194,8 +194,8 @@ def run_verification(filename: str, rows: list) -> dict:
         # 도착지 포트 매핑 해석 (5개 키 중 2개: dest_port_type, dest_terminal_type)
         # TRKV용 도착지명: 상세 ODCY명 값 사용
         trkv_dest_name         = row.get("odcy_name")  # 상세 ODCY명 열 값
-        # TRKV용 도착포트: OM-D 값 기준으로 매핑
-        trkv_dest_port         = _resolve_dest_port_by_omd(om_d)
+        # TRKV용 도착포트: OM-D 값 기준 매핑, 없으면 도착지명 포트 해석 폴백
+        trkv_dest_port         = _resolve_dest_port_by_omd(om_d) or resolve_port(dest_name)
         dest_port_type         = resolve_port(dest_name)
         dest_terminal_type     = resolve_port_terminal_type(dest_name)
 
