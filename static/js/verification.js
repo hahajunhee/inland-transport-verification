@@ -285,7 +285,7 @@ function renderRow(r) {
     ${chargeCell(r.trkv_actual, r.trkv_expected, r.trkv_diff, r.trkv_status, 'cg-t')}
     <!-- 구분값 정보 (10열) -->
     <td class="td-info cg-i">${r.odcy_destination_name || "-"}</td>
-    <td class="td-info cg-i">${r.dest_name || "-"}</td>
+    <td class="td-info cg-i">${r.dest_name_original || "-"}</td>
     <td class="td-info cg-i">${r.odcy_terminal_type || "-"}</td>
     <td class="td-info cg-i">${r.odcy_location || "-"}</td>
     <td class="td-info cg-i">${r.dest_port_type || "-"}</td>

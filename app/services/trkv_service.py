@@ -324,19 +324,20 @@ def get_trkv_expected(
     dg_raw: Optional[str],
     quantity: float = 1.0,
     weekend_holiday: str = "",
+    dest_port_override: Optional[str] = None,
 ) -> Optional[float]:
     """
     TRKV 예상 금액 반환. 설정 누락 시 None 반환 → NO_RATE 처리.
 
     1. pickup_name → resolve_port  → pickup_port
     2. departure_name → resolve_departure → departure_code
-    3. dest_name  → resolve_port  → dest_port
+    3. dest_name  → resolve_port  → dest_port (또는 dest_port_override 우선)
     4. (cont_type, dg_raw) → container_tiers → tier_number
     5. (pickup_port, departure_code, dest_port) → trkv_routes → tier{N} 단가
     """
     # 1. 포트 해석
     pickup_port = resolve_port(pickup_name)
-    dest_port   = resolve_port(dest_name)
+    dest_port   = dest_port_override if dest_port_override else resolve_port(dest_name)
 
     # 2. 출하지 코드 해석
     departure_code = resolve_departure(departure_name)
@@ -387,6 +388,7 @@ def get_trkv_details(
     dg_raw: Optional[str],
     quantity: float = 1.0,
     weekend_holiday: str = "",
+    dest_port_override: Optional[str] = None,
 ) -> dict:
     """
     티어번호 + 단위요율(단가) + 예상금액을 함께 반환.
@@ -395,7 +397,7 @@ def get_trkv_details(
     result = {"tier_number": None, "unit_rate": None, "expected": None}
 
     pickup_port    = resolve_port(pickup_name)
-    dest_port      = resolve_port(dest_name)
+    dest_port      = dest_port_override if dest_port_override else resolve_port(dest_name)
     departure_code = resolve_departure(departure_name)
     is_dg          = str(dg_raw or "").strip().upper() == "X"
 

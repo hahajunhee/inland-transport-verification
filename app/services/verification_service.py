@@ -11,6 +11,25 @@ from app.services.storage_rate_service import find_storage_rate
 
 TOLERANCE = 1.0  # 원 단위 허용 오차
 
+# OM-D 코드 → 도착포트 매핑
+PORT_MAP_OMD = {
+    "KRPUSN": "부산신항",
+    "PUSN16": "부산신항",
+    "PUSN7":  "부산신항",
+    "KRPUS":  "부산북항",
+}
+
+def _resolve_dest_port_by_omd(om_d: str | None) -> str | None:
+    """OM-D 값으로 도착포트 매핑.
+    KRPUSN, PUSN16, PUSN7 → 부산신항 / KRPUS → 부산북항.
+    """
+    if not om_d:
+        return None
+    code = om_d.strip()
+    if not code:
+        return None
+    return PORT_MAP_OMD.get(code)
+
 CHARGES = [
     ("TRKV",   "trkv_actual",    "trkv_expected",    "trkv_diff",    "trkv_status"),
     ("보관료",  "storage_actual", "storage_expected", "storage_diff", "storage_status"),
@@ -80,13 +99,15 @@ def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, conta
                    cont_type=None, dg_raw=None, quantity=1.0, weekend_holiday="",
                    odcy_name_resolved=None, odcy_terminal_type=None,
                    odcy_location=None, dest_port_type=None, dest_terminal_type=None,
-                   storage_tier_number=None, storage_days=None):
+                   storage_tier_number=None, storage_days=None,
+                   trkv_dest_name=None, trkv_dest_port=None):
     """반환: (expected, diff, status, rate_row, unit_rate)"""
     rate_row = None
     unit_rate = None  # 보관료 day당 단가
     if charge_type == "TRKV":
         expected = trkv_service.get_trkv_expected(
-            pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity, weekend_holiday
+            pickup_name, departure_name, trkv_dest_name, cont_type, dg_raw, quantity, weekend_holiday,
+            dest_port_override=trkv_dest_port,
         )
     elif charge_type in ("보관료", "상하차료", "셔틀비용"):
         rate = find_storage_rate(
@@ -163,6 +184,7 @@ def run_verification(filename: str, rows: list) -> dict:
         quantity               = float(row.get("quantity") or 1.0)
         weekend_holiday        = str(row.get("weekend_holiday") or "").strip().upper()
         odcy_destination_name  = row.get("odcy_destination_name")
+        om_d                   = row.get("om_d")
 
         # ODCY 매핑 해석 (5개 키 중 3개: odcy_name, odcy_terminal_type, odcy_location)
         odcy_name_resolved     = resolve_odcy_name(odcy_destination_name or row.get("odcy_name"))
@@ -170,6 +192,10 @@ def run_verification(filename: str, rows: list) -> dict:
         odcy_location          = resolve_odcy_location(odcy_destination_name)
 
         # 도착지 포트 매핑 해석 (5개 키 중 2개: dest_port_type, dest_terminal_type)
+        # TRKV용 도착지명: 상세 ODCY 값 사용
+        trkv_dest_name         = odcy_code  # 상세 ODCY 열 값
+        # TRKV용 도착포트: OM-D 값 기준으로 매핑
+        trkv_dest_port         = _resolve_dest_port_by_omd(om_d)
         dest_port_type         = resolve_port(dest_name)
         dest_terminal_type     = resolve_port_terminal_type(dest_name)
 
@@ -197,12 +223,14 @@ def run_verification(filename: str, rows: list) -> dict:
             "departure_name": departure_name,
             "departure_code_resolved": resolve_departure(departure_name),
             "dest_code": dest_code,
-            "dest_name": dest_name,
-            "dest_port_resolved": resolve_port(dest_name),
+            "dest_name_original": dest_name,
+            "dest_name": trkv_dest_name,
+            "dest_port_resolved": trkv_dest_port,
             "container_type": container_type,
             "dg_flag": row.get("dg_flag", False),
             "quantity": quantity,
             "weekend_holiday": weekend_holiday,
+            "om_d": om_d,
             "odcy_destination_name": odcy_destination_name,
             "odcy_name_resolved": odcy_name_resolved,
             # 구분값 정보 (5개 키)
@@ -221,7 +249,8 @@ def run_verification(filename: str, rows: list) -> dict:
 
         # 티어번호 + 단가 조회 (TRKV 운송 구간 정보에 표시용)
         trkv_details = get_trkv_details(
-            pickup_name, departure_name, dest_name, cont_type, dg_raw, quantity, weekend_holiday
+            pickup_name, departure_name, trkv_dest_name, cont_type, dg_raw, quantity, weekend_holiday,
+            dest_port_override=trkv_dest_port,
         )
         tier_number = trkv_details.get("tier_number")
         result["tier_number"]    = tier_number
@@ -258,6 +287,8 @@ def run_verification(filename: str, rows: list) -> dict:
                     dest_terminal_type=dest_terminal_type,
                     storage_tier_number=storage_tier_number,
                     storage_days=billable_days,
+                    trkv_dest_name=trkv_dest_name,
+                    trkv_dest_port=trkv_dest_port,
                 )
             result[actual_key] = actual
             result[exp_key] = expected

@@ -32,6 +32,7 @@ COLUMN_MAP = {
     "ODCY 셔틀료":            "shuttle_actual",
     "ODCY 반입일":            "odcy_in_date",
     "ODCY 반출일":            "odcy_out_date",
+    "OM-D":                   "om_d",
 }
 
 
@@ -153,7 +154,7 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
         row["odcy_out_date"] = _parse_date(row.get("odcy_out_date"))
 
         # 코드/이름 strip
-        for field in ("pickup_code", "pickup_name", "odcy_code", "odcy_name", "odcy_destination_name", "dest_code", "dest_name", "container_no", "c_invoice_no", "fwo_doc", "departure_name"):
+        for field in ("pickup_code", "pickup_name", "odcy_code", "odcy_name", "odcy_destination_name", "dest_code", "dest_name", "container_no", "c_invoice_no", "fwo_doc", "departure_name", "om_d"):
             val = str(row.get(field) or "").strip()
             row[field] = val if val not in ("nan", "None", "") else None
 
@@ -292,7 +293,7 @@ def generate_results_excel(results: list) -> bytes:
             g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"), g("weekend_holiday") or "", g("tier_number"), g("trkv_rate_row"),
             g("trkv_unit_rate"), g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
             # 구분값 정보
-            g("odcy_destination_name"), g("dest_name"),
+            g("odcy_destination_name"), g("dest_name_original"),
             g("odcy_terminal_type"), g("odcy_location"), g("dest_port_type"), g("dest_terminal_type"),
             g("odcy_in_date"), g("odcy_out_date"), g("storage_days"), g("billable_days"), g("storage_rate_row"),
             # 보관료
