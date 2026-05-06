@@ -100,6 +100,7 @@ _SCHEMAS = {
     ],
     "storage_rates": [
         "id INTEGER PRIMARY KEY",
+        "om_a TEXT DEFAULT ''",
         "odcy_name TEXT DEFAULT ''",
         "odcy_terminal_type TEXT DEFAULT ''",
         "odcy_location TEXT DEFAULT ''",
@@ -161,6 +162,11 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_results_session "
         "ON verification_results(session_id)"
     )
+    # 기존 DB 마이그레이션: storage_rates에 om_a 컬럼 추가
+    try:
+        conn.execute("ALTER TABLE storage_rates ADD COLUMN om_a TEXT DEFAULT ''")
+    except Exception:
+        pass  # 이미 존재하면 무시
     conn.commit()
 
 

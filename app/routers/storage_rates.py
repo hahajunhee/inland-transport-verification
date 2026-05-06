@@ -145,19 +145,35 @@ async def upload_storage_rates(file: UploadFile = File(...)):
     data_store.save("storage_rates.json", [])
     success, failed, new_items, next_id = 0, [], [], 1
 
-    odcy_col     = col_map.get("ODCY명")
-    term_col     = col_map.get("odcy터미널구분") if "odcy터미널구분" in col_map else (col_map.get("터미널구분") if "터미널구분" in col_map else col_map.get("단지구분"))
-    loc_col      = col_map.get("ODCY_위치")
-    dpt_col      = col_map.get("도착지포트구분")
-    dtt_col      = col_map.get("도착지터미널구분")
-    storage_col  = col_map.get("보관료 단가")
-    handling_col = col_map.get("상하차료 단가")
-    memo_col     = col_map.get("비고")
+    # 헤더에 [OM-A] 등 접미사가 붙어있을 수 있으므로 부분 매칭 헬퍼
+    def _find_col(*keywords):
+        """col_map에서 keyword를 포함하는 헤더를 찾아 인덱스 반환."""
+        for kw in keywords:
+            # 정확한 매칭 우선
+            if kw in col_map:
+                return col_map[kw]
+        for kw in keywords:
+            # 부분 매칭
+            for header_name, idx in col_map.items():
+                if kw in header_name:
+                    return idx
+        return None
+
+    om_a_col     = _find_col("ODCY도착지명")                     # OM-A
+    odcy_col     = _find_col("ODCY명")                            # OM-B
+    term_col     = _find_col("odcy터미널구분", "터미널구분", "단지구분")  # OM-C
+    loc_col      = _find_col("ODCY_위치")                         # OM-D
+    dpt_col      = _find_col("도착지포트구분")
+    dtt_col      = _find_col("도착지터미널구분")
+    storage_col  = _find_col("보관료 단가")
+    handling_col = _find_col("상하차료 단가")
+    memo_col     = _find_col("비고")
 
     for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
         def gv(col_idx):
             return row[col_idx].value if col_idx is not None else None
 
+        om_a               = str(gv(om_a_col) or "").strip()
         odcy_name          = str(gv(odcy_col) or "").strip()
         odcy_terminal_type = str(gv(term_col) or "").strip()
         odcy_location      = str(gv(loc_col) or "").strip()
@@ -171,6 +187,7 @@ async def upload_storage_rates(file: UploadFile = File(...)):
 
         new_items.append({
             "id": next_id,
+            "om_a": om_a,
             "odcy_name": odcy_name,
             "odcy_terminal_type": odcy_terminal_type,
             "odcy_location": odcy_location,

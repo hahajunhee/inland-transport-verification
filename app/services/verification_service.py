@@ -15,7 +15,7 @@ TOLERANCE = 1.0  # 원 단위 허용 오차
 BUSN_SINPORT_OMD = {"KRPUSN", "PUSN16", "PUSN7"}
 
 def _resolve_om_d_from_rates(odcy_name_val: str | None) -> str | None:
-    """상세 ODCY명 → 요율파일(storage_rates)의 OM-A에서 매칭하여 OM-D(odcy_location) 반환."""
+    """상세 ODCY명 → 요율파일(storage_rates)의 OM-A(om_a)에서 매칭하여 OM-D(odcy_location) 반환."""
     if not odcy_name_val:
         return None
     name = odcy_name_val.strip()
@@ -23,7 +23,7 @@ def _resolve_om_d_from_rates(odcy_name_val: str | None) -> str | None:
         return None
     items = data_store.load("storage_rates.json")
     for r in items:
-        if r.get("odcy_name") == name:
+        if r.get("om_a") == name:
             loc = r.get("odcy_location") or ""
             return loc.strip() if loc.strip() else None
     return None
@@ -207,8 +207,8 @@ def run_verification(filename: str, rows: list) -> dict:
 
         # TRKV용 ODCY도착지명: OM-D 값 표시
         trkv_dest_name         = om_d
-        # TRKV용 도착포트: OM-D 값 기준 매핑, 없으면 도착지명 포트 해석 폴백
-        trkv_dest_port         = _resolve_dest_port_by_omd(om_d) or resolve_port(dest_name)
+        # TRKV용 도착포트: OM-D 값 기준으로만 매핑 (OM-D가 없으면 None)
+        trkv_dest_port         = _resolve_dest_port_by_omd(om_d)
         dest_port_type         = resolve_port(dest_name)
         dest_terminal_type     = resolve_port_terminal_type(dest_name)
 
