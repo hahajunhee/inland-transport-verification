@@ -217,8 +217,8 @@ def generate_results_excel(results: list) -> bytes:
         # 운송 구간 정보 (6-21)
         "픽업지코드", "픽업지명", "픽업포트(매핑)",
         "출하지명", "출하코드(매핑)",
-        "ODCY코드", "ODCY명",
-        "도착지코드", "도착지명", "도착포트(매핑)",
+        "ODCY코드", "ODCY(상세ODCY명)",
+        "도착지코드", "ODCY도착지명", "도착포트(매핑)",
         "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호", "TRKV요율#",
         # TRKV (22-26)
         "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
@@ -265,7 +265,7 @@ def generate_results_excel(results: list) -> bytes:
         "검증: 픽업지", "검증: 픽업지명", "요율표: PM-A",
         "검증: 출하지명", "요율표: DM-A",
         "검증: 상세ODCY", "검증: 상세ODCY명",
-        "검증: 도착지", "검증: OM-D", "OM-D 값을 통해 변환",
+        "검증: 도착지", "요율표: OM-A→OM-D", "OM-D 값을 통해 변환",
         "검증: Cont.Category", "검증: D/G여부", "검증: Quantity", "검증: Weekend/Holiday", "요율표: 컨테이너티어", "요율표: TRKV구간",
         # TRKV (22-26)
         "요율표: TRKV구간", "검증: Mobis운임합계", "계산", "계산", "계산",

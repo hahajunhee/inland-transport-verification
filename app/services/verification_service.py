@@ -14,6 +14,20 @@ TOLERANCE = 1.0  # 원 단위 허용 오차
 # OM-D 코드 → 도착포트 매핑
 BUSN_SINPORT_OMD = {"KRPUSN", "PUSN16", "PUSN7"}
 
+def _resolve_om_d_from_rates(odcy_name_val: str | None) -> str | None:
+    """상세 ODCY명 → 요율파일(storage_rates)의 OM-A에서 매칭하여 OM-D(odcy_location) 반환."""
+    if not odcy_name_val:
+        return None
+    name = odcy_name_val.strip()
+    if not name:
+        return None
+    items = data_store.load("storage_rates.json")
+    for r in items:
+        if r.get("odcy_name") == name:
+            loc = r.get("odcy_location") or ""
+            return loc.strip() if loc.strip() else None
+    return None
+
 def _resolve_dest_port_by_omd(om_d: str | None) -> str | None:
     """OM-D 값으로 도착포트 매핑.
     KRPUSN, PUSN16, PUSN7 → 부산신항 / 그 외 → 부산북항.
@@ -181,16 +195,18 @@ def run_verification(filename: str, rows: list) -> dict:
         quantity               = float(row.get("quantity") or 1.0)
         weekend_holiday        = str(row.get("weekend_holiday") or "").strip().upper()
         odcy_destination_name  = row.get("odcy_destination_name")
-        om_d                   = row.get("om_d")
 
         # ODCY 매핑 해석 (5개 키 중 3개: odcy_name, odcy_terminal_type, odcy_location)
         odcy_name_resolved     = resolve_odcy_name(odcy_destination_name or row.get("odcy_name"))
         odcy_terminal_type     = resolve_terminal_type(odcy_destination_name)
         odcy_location          = resolve_odcy_location(odcy_destination_name)
 
-        # 도착지 포트 매핑 해석 (5개 키 중 2개: dest_port_type, dest_terminal_type)
-        # TRKV용 도착지명: OM-D 열 값 사용
-        trkv_dest_name         = om_d  # OM-D 열 값
+        # OM-D: 상세 ODCY명(odcy_name) → 요율파일 OM-A 매칭 → OM-D(odcy_location) 조회
+        odcy_name_val          = row.get("odcy_name")  # 검증파일의 상세 ODCY명
+        om_d                   = _resolve_om_d_from_rates(odcy_name_val)
+
+        # TRKV용 ODCY도착지명: OM-D 값 표시
+        trkv_dest_name         = om_d
         # TRKV용 도착포트: OM-D 값 기준 매핑, 없으면 도착지명 포트 해석 폴백
         trkv_dest_port         = _resolve_dest_port_by_omd(om_d) or resolve_port(dest_name)
         dest_port_type         = resolve_port(dest_name)

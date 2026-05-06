@@ -272,7 +272,7 @@ function renderRow(r) {
     <td class="cg-r">${pickupPort}</td>
     <td class="cg-r">${r.departure_name || "-"}</td>
     <td class="cg-r">${r.departure_code_resolved ? `<span class="port-resolved">${r.departure_code_resolved}</span>` : "-"}</td>
-    <td class="cg-r" title="${r.odcy_name || ""}">${r.odcy_code || r.odcy_name || "-"}</td>
+    <td class="cg-r" title="${r.odcy_code || ""}">${r.odcy_name || "-"}</td>
     <td class="cg-r">${r.dest_name || "-"}</td>
     <td class="cg-r">${destPort}</td>
     <td class="cg-r">${r.container_type || "-"}</td>

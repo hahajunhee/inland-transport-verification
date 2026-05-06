@@ -131,7 +131,7 @@
             <th class="th-route cg-r sortable-th" onclick="sortBy('departure_name')">출하지명 <span class="sort-arrow">↕</span></th>
             <th class="th-route cg-r sortable-th" onclick="sortBy('departure_code_resolved')">출하지코드<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
             <th class="th-route cg-r sortable-th" onclick="sortBy('odcy_name')">ODCY <span class="sort-arrow">↕</span></th>
-            <th class="th-route cg-r sortable-th" onclick="sortBy('dest_name')">도착지명 <span class="sort-arrow">↕</span></th>
+            <th class="th-route cg-r sortable-th" onclick="sortBy('dest_name')">ODCY<br>도착지명 <span class="sort-arrow">↕</span></th>
             <th class="th-route cg-r sortable-th" onclick="sortBy('dest_port_resolved')">도착포트<br><small>(매핑)</small> <span class="sort-arrow">↕</span></th>
             <th class="th-route cg-r sortable-th" onclick="sortBy('container_type')">컨테이너유형 <span class="sort-arrow">↕</span></th>
             <th class="th-route cg-r sortable-th" onclick="sortBy('quantity')">수량 <span class="sort-arrow">↕</span></th>
@@ -175,8 +175,8 @@
             <th class="th-source th-route cg-r">요율표: PM-A</th>
             <th class="th-source th-route cg-r">검증: 출하지명</th>
             <th class="th-source th-route cg-r">요율표: DM-A</th>
-            <th class="th-source th-route cg-r">검증: 상세ODCY</th>
-            <th class="th-source th-route cg-r">검증: OM-D</th>
+            <th class="th-source th-route cg-r">검증: 상세ODCY명</th>
+            <th class="th-source th-route cg-r">요율표: OM-A→OM-D</th>
             <th class="th-source th-route cg-r">OM-D 값을 통해 변환</th>
             <th class="th-source th-route cg-r">검증: Cont.Category</th>
             <th class="th-source th-route cg-r">검증: Quantity</th>
@@ -312,5 +312,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/verification.js?v=20260506"></script>
+<script src="/static/js/verification.js?v=20260506b"></script>
 {% endblock %}
