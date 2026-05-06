@@ -41,16 +41,25 @@ def verification_page(request: Request):
     return templates.TemplateResponse("verification.html", {"request": request})
 
 
+@router.get("/rate-register")
+def rate_register_page(request: Request):
+    return templates.TemplateResponse("rate_register.html", {"request": request})
+
+
+# 하위호환: 기존 URL 유지 (요율등록 페이지로 리다이렉트)
 @router.get("/trkv")
 def trkv_page(request: Request):
-    return templates.TemplateResponse("trkv.html", {"request": request})
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/rate-register")
 
 
 @router.get("/mapping")
 def mapping_page(request: Request):
-    return templates.TemplateResponse("mapping.html", {"request": request})
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/rate-register")
 
 
 @router.get("/storage-rates")
 def storage_rates_page(request: Request):
-    return templates.TemplateResponse("storage_rates.html", {"request": request})
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/rate-register")

@@ -231,12 +231,14 @@ def _find_col(col_map: dict, *names) -> Optional[int]:
 
 @router.get("/template")
 def download_unified_template():
-    """현재 등록된 데이터를 포함한 통합 양식 다운로드 (전체 교체용, 5-시트)"""
+    """현재 등록된 데이터를 포함한 통합 양식 다운로드 (전체 교체용, 6-시트)"""
     port_mappings      = trkv_service.get_all_port_mappings()
     departure_mappings = trkv_service.get_all_departure_mappings()
     odcy_mappings      = trkv_service.get_all_odcy_mappings()
     routes             = trkv_service.get_all_routes()
     storage_rates      = storage_rate_service.get_all_storage_rates()
+    container_tiers    = trkv_service.get_all_container_tiers()
+    storage_cont_tiers = trkv_service.get_all_storage_container_tiers()
 
     wb = openpyxl.Workbook()
 
@@ -403,6 +405,32 @@ def download_unified_template():
                       8000,  9000,  10000, None, None, None,
                       5000,  6000,  7000,  None, None, None,
                       "예시 (등록 후 삭제)"])
+
+    # ── Sheet 6: 컨테이너 티어 ───────────────────────────────────────
+    ws_ct = wb.create_sheet("컨테이너 티어")
+    CT_HDR_FILL = PatternFill("solid", fgColor="8B5CF6")
+    CT_HDR_FONT = Font(bold=True, color="FFFFFF")
+
+    ct_headers = ["Cont.Type", "D/G여부", "TRKV 티어번호", "보관료/상하차료/셔틀비 티어번호"]
+    ws_ct.append(ct_headers)
+    for cell in ws_ct[1]:
+        cell.fill = CT_HDR_FILL
+        cell.font = CT_HDR_FONT
+        cell.alignment = Alignment(horizontal="center")
+    for i, w in enumerate([18, 14, 20, 30], 1):
+        ws_ct.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    # 기존 데이터를 (cont_type, is_dg) 기준으로 합쳐서 출력
+    CONT_TYPES = ["22G1", "22R1", "45G1", "45R1"]
+    DG_OPTIONS = [False, True]
+    ct_map = {(t["cont_type"], t["is_dg"]): t.get("tier_number") for t in container_tiers}
+    sct_map = {(t["cont_type"], t["is_dg"]): t.get("tier_number") for t in storage_cont_tiers}
+
+    for ct in CONT_TYPES:
+        for is_dg in DG_OPTIONS:
+            trkv_tier = ct_map.get((ct, is_dg))
+            storage_tier = sct_map.get((ct, is_dg))
+            ws_ct.append([ct, "X" if is_dg else "", trkv_tier, storage_tier])
 
     buf = BytesIO()
     wb.save(buf)
@@ -734,6 +762,71 @@ def _process_upload(wb):
             data_store.save("storage_rates.json", new_items)
             result["보관료_상하차료_셔틀비 요율"] = {"success": success, "failed": failed}
             break  # 시트 하나만 처리
+
+    # ── 컨테이너 티어 시트 ─────────────────────────────────────────
+    if "컨테이너 티어" in wb.sheetnames:
+        ws = wb["컨테이너 티어"]
+        header = [cell.value for cell in ws[1]]
+        col_map = {str(v).strip(): i for i, v in enumerate(header) if v is not None}
+
+        ct_col = _find_col(col_map, "Cont.Type", "cont_type", "컨테이너타입")
+        dg_col = _find_col(col_map, "D/G여부", "D/G", "DG여부", "is_dg")
+        trkv_tier_col = _find_col(col_map, "TRKV 티어번호", "TRKV티어번호", "TRKV 티어")
+        storage_tier_col = _find_col(col_map,
+            "보관료/상하차료/셔틀비 티어번호", "보관료/상하차료/셔틀비 티어",
+            "보관료 티어번호", "보관료 티어")
+
+        if has_data(ws) and ct_col is not None:
+            trkv_items = []
+            storage_items = []
+            next_trkv_id = 1
+            next_storage_id = 1
+            success = 0
+            failed = []
+
+            for i, row in enumerate(ws.iter_rows(min_row=2), start=2):
+                cont_type_val = row[ct_col].value if ct_col is not None else None
+                if not cont_type_val or str(cont_type_val).strip() == "":
+                    continue
+
+                ct_str = str(cont_type_val).strip()
+                dg_val = str(row[dg_col].value or "").strip().upper() if dg_col is not None else ""
+                is_dg = dg_val in ("X", "TRUE", "1", "Y", "YES")
+
+                trkv_tier = None
+                if trkv_tier_col is not None and row[trkv_tier_col].value is not None:
+                    try:
+                        trkv_tier = int(row[trkv_tier_col].value)
+                    except (ValueError, TypeError):
+                        pass
+
+                storage_tier = None
+                if storage_tier_col is not None and row[storage_tier_col].value is not None:
+                    try:
+                        storage_tier = int(row[storage_tier_col].value)
+                    except (ValueError, TypeError):
+                        pass
+
+                trkv_items.append({
+                    "id": next_trkv_id,
+                    "cont_type": ct_str,
+                    "is_dg": is_dg,
+                    "tier_number": trkv_tier,
+                })
+                next_trkv_id += 1
+
+                storage_items.append({
+                    "id": next_storage_id,
+                    "cont_type": ct_str,
+                    "is_dg": is_dg,
+                    "tier_number": storage_tier,
+                })
+                next_storage_id += 1
+                success += 1
+
+            data_store.save("container_tiers.json", trkv_items)
+            data_store.save("storage_container_tiers.json", storage_items)
+            result["컨테이너 티어"] = {"success": success, "failed": failed}
 
     if not result:
         raise HTTPException(400, detail="처리할 수 있는 시트가 없습니다. 통합 양식을 사용하세요.")

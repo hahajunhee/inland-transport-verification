@@ -9,27 +9,22 @@
 <!-- 요약 카드 -->
 <div class="stat-cards">
   <div class="stat-card">
-    <div class="stat-label">등록된 요율</div>
-    <div class="stat-value">{{ rate_count }}</div>
-    <a href="/rates" class="stat-link">요율 관리 &rarr;</a>
+    <div class="stat-label">TRKV 구간 요율</div>
+    <div class="stat-value">{{ trkv_route_count }}</div>
+    <a href="/rate-register" class="stat-link">요율등록 &rarr;</a>
   </div>
   <div class="stat-card">
     <div class="stat-label">검증 세션</div>
     <div class="stat-value">{{ session_count }}</div>
     <a href="/verification" class="stat-link">정산 검증 &rarr;</a>
   </div>
-  <div class="stat-card">
-    <div class="stat-label">TRKV 구간 요율</div>
-    <div class="stat-value">{{ trkv_route_count }}</div>
-    <a href="/trkv" class="stat-link">TRKV 설정 &rarr;</a>
-  </div>
   <div class="stat-card {% if trkv_tier_set < 8 %}stat-card-warn{% endif %}">
     <div class="stat-label">컨테이너 티어 설정</div>
     <div class="stat-value">{{ trkv_tier_set }} <span style="font-size:16px;color:#888">/ 8</span></div>
     {% if trkv_tier_set < 8 %}
-    <a href="/trkv#tier" class="stat-link" style="color:#f59e0b">설정 필요 &rarr;</a>
+    <a href="/rate-register" class="stat-link" style="color:#f59e0b">요율등록에서 설정 &rarr;</a>
     {% else %}
-    <a href="/trkv" class="stat-link">설정 완료 ✓</a>
+    <a href="/rate-register" class="stat-link">설정 완료 ✓</a>
     {% endif %}
   </div>
 </div>

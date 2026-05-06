@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}요율등록 - 내륙운송정산검증{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">요율등록</h1>
+  <p class="page-desc">모든 요율 데이터를 하나의 엑셀 파일로 관리합니다. (매핑설정 · TRKV 구간요율 · 보관료/상하차료/셔틀비 · 컨테이너 티어)</p>
+</div>
+
+<div class="card rate-register-card">
+  <div class="rate-register-content">
+    <div class="rate-register-icon">📋</div>
+    <h2 class="rate-register-title">통합 요율 파일</h2>
+    <p class="rate-register-desc">
+      아래 버튼으로 현재 등록된 요율을 다운로드하거나, 수정한 파일을 업로드하여 전체 교체할 수 있습니다.<br>
+      <strong>업로드 시 기존 데이터는 모두 교체됩니다.</strong>
+    </p>
+
+    <div class="rate-register-actions">
+      <button type="button" class="btn btn-lg btn-outline" onclick="downloadRates()">
+        📥 요율 다운로드
+      </button>
+      <label class="btn btn-lg btn-primary file-label">
+        📤 요율 업로드
+        <input type="file" id="rate-file" accept=".xlsx,.xls" style="display:none" onchange="uploadRates()" />
+      </label>
+    </div>
+
+    <div id="upload-msg" class="upload-result" style="display:none"></div>
+  </div>
+</div>
+
+<!-- 시트 구성 안내 -->
+<div class="card">
+  <h2 class="card-title">엑셀 파일 시트 구성</h2>
+  <div class="sheet-info-grid">
+    <div class="sheet-info-item">
+      <div class="sheet-badge sheet-badge-1">Sheet 1</div>
+      <div class="sheet-info-body">
+        <strong>포트명 매핑</strong>
+        <span class="sheet-info-desc">엑셀 포트명 → 포트구분 · 터미널구분</span>
+      </div>
+    </div>
+    <div class="sheet-info-item">
+      <div class="sheet-badge sheet-badge-2">Sheet 2</div>
+      <div class="sheet-info-body">
+        <strong>출하지 매핑</strong>
+        <span class="sheet-info-desc">엑셀 출하지명 → 출하지코드</span>
+      </div>
+    </div>
+    <div class="sheet-info-item">
+      <div class="sheet-badge sheet-badge-3">Sheet 3</div>
+      <div class="sheet-info-body">
+        <strong>ODCY 매핑</strong>
+        <span class="sheet-info-desc">ODCY도착지명 → ODCY명 · 터미널구분 · 위치</span>
+      </div>
+    </div>
+    <div class="sheet-info-item">
+      <div class="sheet-badge sheet-badge-4">Sheet 4</div>
+      <div class="sheet-info-body">
+        <strong>TRKV 구간 요율</strong>
+        <span class="sheet-info-desc">픽업항 → 출하지 → 도착항 구간별 티어1~6 단가</span>
+      </div>
+    </div>
+    <div class="sheet-info-item">
+      <div class="sheet-badge sheet-badge-5">Sheet 5</div>
+      <div class="sheet-info-body">
+        <strong>보관료/상하차료/셔틀비 요율</strong>
+        <span class="sheet-info-desc">ODCY·포트 조합별 보관료 · 상하차료 · 셔틀비 티어별 단가</span>
+      </div>
+    </div>
+    <div class="sheet-info-item">
+      <div class="sheet-badge sheet-badge-6">Sheet 6</div>
+      <div class="sheet-info-body">
+        <strong>컨테이너 티어</strong>
+        <span class="sheet-info-desc">Cont.Type × D/G여부별 TRKV 티어 · 보관료/상하차료/셔틀비 티어</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.rate-register-card {
+  text-align: center;
+  padding: 40px 24px;
+}
+.rate-register-content {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.rate-register-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+.rate-register-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+.rate-register-desc {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 24px;
+}
+.rate-register-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.btn-lg {
+  padding: 12px 32px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.file-label { cursor: pointer; }
+.upload-result {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+.upload-result.ok {
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+.upload-result.err {
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+/* 시트 구성 안내 */
+.sheet-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+.sheet-info-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+.sheet-badge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+.sheet-badge-1 { background: #3b82f6; }
+.sheet-badge-2 { background: #10b981; }
+.sheet-badge-3 { background: #f59e0b; }
+.sheet-badge-4 { background: #6366f1; }
+.sheet-badge-5 { background: #ec4899; }
+.sheet-badge-6 { background: #8b5cf6; }
+.sheet-info-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sheet-info-body strong {
+  font-size: 14px;
+  color: #1e293b;
+}
+.sheet-info-desc {
+  font-size: 12px;
+  color: #94a3b8;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function downloadRates() {
+  window.location.href = "/api/trkv/template";
+}
+
+async function uploadRates() {
+  const fileInput = document.getElementById("rate-file");
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const msgEl = document.getElementById("upload-msg");
+  msgEl.textContent = "업로드 중...";
+  msgEl.className = "upload-result";
+  msgEl.style.display = "block";
+
+  try {
+    const res = await fetch("/api/trkv/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (res.ok) {
+      const parts = [];
+      for (const [sheet, info] of Object.entries(data.sheets || {})) {
+        parts.push(`${sheet} ${info.success}건`);
+      }
+      msgEl.innerHTML = `✅ 업로드 완료<br>${parts.join(" · ")}`;
+      msgEl.className = "upload-result ok";
+    } else {
+      msgEl.textContent = `❌ ${data.detail || "업로드 실패"}`;
+      msgEl.className = "upload-result err";
+    }
+  } catch {
+    msgEl.textContent = "❌ 네트워크 오류";
+    msgEl.className = "upload-result err";
+  }
+  fileInput.value = "";
+}
+</script>
+{% endblock %}
