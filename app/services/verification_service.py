@@ -14,17 +14,17 @@ TOLERANCE = 1.0  # 원 단위 허용 오차
 # OM-D 코드 → 도착포트 매핑
 BUSN_SINPORT_OMD = {"KRPUSN", "PUSN16", "PUSN7"}
 
-def _resolve_om_d_from_rates(odcy_name_val: str | None) -> str | None:
-    """상세 ODCY명 → 요율파일(storage_rates)의 OM-A(om_a)에서 매칭하여 OM-D(odcy_location) 반환."""
+def _resolve_om_d(odcy_name_val: str | None) -> str | None:
+    """상세 ODCY명 → ODCY매핑(odcy_mappings)의 OM-A(odcy_destination_name)에서 매칭하여 OM-D(odcy_location) 반환."""
     if not odcy_name_val:
         return None
     name = odcy_name_val.strip()
     if not name:
         return None
-    items = data_store.load("storage_rates.json")
-    for r in items:
-        if r.get("om_a") == name:
-            loc = r.get("odcy_location") or ""
+    items = data_store.load("odcy_mappings.json")
+    for m in items:
+        if m.get("odcy_destination_name") == name:
+            loc = m.get("odcy_location") or ""
             return loc.strip() if loc.strip() else None
     return None
 
@@ -201,9 +201,9 @@ def run_verification(filename: str, rows: list) -> dict:
         odcy_terminal_type     = resolve_terminal_type(odcy_destination_name)
         odcy_location          = resolve_odcy_location(odcy_destination_name)
 
-        # OM-D: 상세 ODCY명(odcy_name) → 요율파일 OM-A 매칭 → OM-D(odcy_location) 조회
+        # OM-D: 상세 ODCY명 → ODCY매핑의 OM-A 매칭 → OM-D(odcy_location) 조회
         odcy_name_val          = row.get("odcy_name")  # 검증파일의 상세 ODCY명
-        om_d                   = _resolve_om_d_from_rates(odcy_name_val)
+        om_d                   = _resolve_om_d(odcy_name_val)
 
         # TRKV용 ODCY도착지명: OM-D 값 표시
         trkv_dest_name         = om_d
