@@ -645,9 +645,11 @@ def _process_upload(wb):
 
             data_store.save("storage_rates.json", [])
 
-            # 새 형식: A=ODCY도착지명(엑셀원본명), B=포트명(엑셀원본명) → 매핑으로 5키 resolve
+            # OM-A 컬럼 탐색 (새/구 형식 공통)
             odcy_dest_col = _find_col(col_map,
-                "ODCY도착지명(엑셀원본명) [OM-A]", "ODCY도착지명(엑셀원본명)")
+                "ODCY도착지명(엑셀원본명) [OM-A]", "ODCY도착지명(엑셀원본명)",
+                "ODCY도착지명")
+            # 새 형식: PM-A 컬럼도 있으면 매핑 resolve 사용
             port_excel_col = _find_col(col_map,
                 "포트명(엑셀원본명) [PM-A]", "포트명(엑셀원본명)")
 
@@ -720,8 +722,14 @@ def _process_upload(wb):
                     "상하차료_T": "handling_tier",
                     "셔틀비_T": "shuttle_tier",
                 }
+                # OM-A: 형식 무관하게 odcy_dest_col이 있으면 항상 저장
+                om_a_val = ""
+                if odcy_dest_col is not None:
+                    om_a_val = str(_gv2(odcy_dest_col) or "").strip()
+
                 obj = {
                     "id": next_id,
+                    "om_a": om_a_val,
                     "odcy_name": odcy_name,
                     "odcy_terminal_type": odcy_terminal_type,
                     "odcy_location": odcy_location,
@@ -730,7 +738,6 @@ def _process_upload(wb):
                     "memo": str(_gv2(memo_col) or "").strip(),
                 }
                 if use_new_format:
-                    obj["om_a"] = odcy_dest_val
                     obj["port_excel_name"] = port_excel_val
                 all_none = True
                 for prefix, key in sr_cols.items():
