@@ -12,23 +12,20 @@ from app.services.storage_rate_service import find_storage_rate
 TOLERANCE = 1.0  # 원 단위 허용 오차
 
 # OM-D 코드 → 도착포트 매핑
-PORT_MAP_OMD = {
-    "KRPUSN": "부산신항",
-    "PUSN16": "부산신항",
-    "PUSN7":  "부산신항",
-    "KRPUS":  "부산북항",
-}
+BUSN_SINPORT_OMD = {"KRPUSN", "PUSN16", "PUSN7"}
 
 def _resolve_dest_port_by_omd(om_d: str | None) -> str | None:
     """OM-D 값으로 도착포트 매핑.
-    KRPUSN, PUSN16, PUSN7 → 부산신항 / KRPUS → 부산북항.
+    KRPUSN, PUSN16, PUSN7 → 부산신항 / 그 외 → 부산북항.
     """
     if not om_d:
         return None
     code = om_d.strip()
     if not code:
         return None
-    return PORT_MAP_OMD.get(code)
+    if code in BUSN_SINPORT_OMD:
+        return "부산신항"
+    return "부산북항"
 
 CHARGES = [
     ("TRKV",   "trkv_actual",    "trkv_expected",    "trkv_diff",    "trkv_status"),
@@ -192,8 +189,8 @@ def run_verification(filename: str, rows: list) -> dict:
         odcy_location          = resolve_odcy_location(odcy_destination_name)
 
         # 도착지 포트 매핑 해석 (5개 키 중 2개: dest_port_type, dest_terminal_type)
-        # TRKV용 도착지명: 상세 ODCY명 값 사용
-        trkv_dest_name         = row.get("odcy_name")  # 상세 ODCY명 열 값
+        # TRKV용 도착지명: OM-D 열 값 사용
+        trkv_dest_name         = om_d  # OM-D 열 값
         # TRKV용 도착포트: OM-D 값 기준 매핑, 없으면 도착지명 포트 해석 폴백
         trkv_dest_port         = _resolve_dest_port_by_omd(om_d) or resolve_port(dest_name)
         dest_port_type         = resolve_port(dest_name)

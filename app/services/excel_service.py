@@ -265,7 +265,7 @@ def generate_results_excel(results: list) -> bytes:
         "검증: 픽업지", "검증: 픽업지명", "요율표: PM-A",
         "검증: 출하지명", "요율표: DM-A",
         "검증: 상세ODCY", "검증: 상세ODCY명",
-        "검증: 도착지", "검증: 상세ODCY명", "OM-D 값을 통해 변환",
+        "검증: 도착지", "검증: OM-D", "OM-D 값을 통해 변환",
         "검증: Cont.Category", "검증: D/G여부", "검증: Quantity", "검증: Weekend/Holiday", "요율표: 컨테이너티어", "요율표: TRKV구간",
         # TRKV (22-26)
         "요율표: TRKV구간", "검증: Mobis운임합계", "계산", "계산", "계산",
