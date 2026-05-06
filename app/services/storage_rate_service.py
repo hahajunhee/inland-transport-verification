@@ -15,16 +15,14 @@ def find_storage_rate(
     om_a: Optional[str] = None,
 ) -> dict:
     """
-    6개 키 (OM-A, ODCY명, odcy터미널구분, ODCY_위치, 포트구분, 터미널구분) 기준으로
-    보관료/상하차료/셔틀비 티어 요율 조회.
-    OM-A(odcy_destination_name)가 가장 높은 우선순위로 매칭.
+    보관료/상하차료/셔틀비 요율 조회.
+    OM-A(ODCY도착지명)를 첫 번째 키로 정확 매칭한 뒤,
+    나머지 5키(ODCY명, odcy터미널구분, ODCY_위치, 포트구분, 터미널구분)로 세부 매칭.
     반환: {"storage_unit": ..., "handling_unit": ..., "shuttle_unit": ...}
     """
     items = data_store.load("storage_rates.json")
 
-    def matches(r: dict) -> bool:
-        if om_a and r.get("om_a") and r["om_a"] != om_a:
-            return False
+    def matches_sub(r: dict) -> bool:
         if odcy_name and r.get("odcy_name") and r["odcy_name"] != odcy_name:
             return False
         if odcy_terminal_type and r.get("odcy_terminal_type") and r["odcy_terminal_type"] != odcy_terminal_type:
@@ -37,13 +35,22 @@ def find_storage_rate(
             return False
         return True
 
-    candidates = [r for r in items if matches(r)]
+    # 1단계: OM-A 정확 매칭 (첫 번째 키)
+    candidates = []
+    if om_a:
+        candidates = [r for r in items if r.get("om_a") == om_a and matches_sub(r)]
+
+    # 2단계: OM-A 매칭 결과 없으면 기존 5키로 폴백
+    if not candidates:
+        candidates = [r for r in items if matches_sub(r)]
+
     if not candidates:
         return {}
 
     def specificity(r: dict) -> int:
         score = 0
-        if r.get("om_a"):               score += 8
+        if r.get("om_a") and om_a and r["om_a"] == om_a:
+            score += 16
         if r.get("odcy_name"):           score += 4
         if r.get("odcy_terminal_type"):   score += 2
         if r.get("odcy_location"):        score += 2
@@ -54,10 +61,9 @@ def find_storage_rate(
     candidates.sort(key=specificity, reverse=True)
     best = candidates[0]
 
-    # best의 행번호 찾기 (정렬된 전체 목록 기준, 헤더 2행 → 데이터는 3행부터)
-    all_sorted = sorted(items, key=lambda x: (x.get("odcy_name", ""), x.get("odcy_terminal_type", ""), x.get("id", 0)))
+    # best의 행번호 찾기 (ID 순서 기준, 헤더 2행 → 데이터는 3행부터)
     rate_row_num = None
-    for idx, r in enumerate(all_sorted, 3):  # 헤더 2행 → 데이터는 3행부터
+    for idx, r in enumerate(items, 3):  # 헤더 2행 → 데이터는 3행부터
         if r.get("id") == best.get("id"):
             rate_row_num = idx
             break

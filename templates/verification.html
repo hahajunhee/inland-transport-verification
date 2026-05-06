@@ -155,7 +155,7 @@
             <th class="th-info cg-i sortable-th" onclick="sortBy('odcy_out_date')">반출일 <span class="sort-arrow">↕</span></th>
             <th class="th-info cg-i sortable-th" onclick="sortBy('storage_days')">보관일수 <span class="sort-arrow">↕</span></th>
             <th class="th-info cg-i">FREE반영</th>
-            <th class="th-info cg-i">보관요율# <span class="help-tip" title="ODCY명(OM-B) + odcy터미널구분(OM-C) + ODCY_위치(OM-D) + 도착지포트구분(PM-B) + 도착지터미널구분(PM-C) 5개 키로 보관료요율 테이블에서 매칭된 행번호입니다.&#10;해당 행의 보관료/상하차료/셔틀비 단가를 사용합니다.">❓</span></th>
+            <th class="th-info cg-i">보관요율# <span class="help-tip" title="① ODCY도착지명(OM-A) 정확 매칭 (첫 번째 키)&#10;② ODCY명(OM-B) + odcy터미널구분(OM-C) + ODCY_위치(OM-D) + 도착지포트구분(PM-B) + 도착지터미널구분(PM-C)&#10;OM-A 일치 행을 최우선 선택하고, 나머지 5키로 세부 매칭합니다.&#10;해당 행의 보관료/상하차료/셔틀비 단가를 사용합니다.">❓</span></th>
             <!-- 보관료 6열 -->
             <th class="th-storage cg-s">티어</th>
             <th class="th-storage cg-s">단가(일)</th>
@@ -200,7 +200,7 @@
             <th class="th-source th-info cg-i">검증: ODCY 반출일</th>
             <th class="th-source th-info cg-i">계산</th>
             <th class="th-source th-info cg-i">계산</th>
-            <th class="th-source th-info cg-i">요율표: 보관료</th>
+            <th class="th-source th-info cg-i">요율표: OM-A+5키 매칭</th>
             <!-- 보관료 6열 -->
             <th class="th-source th-storage cg-s">요율표: 보관료</th>
             <th class="th-source th-storage cg-s">요율표: 보관료</th>
