@@ -730,7 +730,7 @@ def _process_upload(wb):
                     "memo": str(_gv2(memo_col) or "").strip(),
                 }
                 if use_new_format:
-                    obj["odcy_destination_name"] = odcy_dest_val
+                    obj["om_a"] = odcy_dest_val
                     obj["port_excel_name"] = port_excel_val
                 all_none = True
                 for prefix, key in sr_cols.items():

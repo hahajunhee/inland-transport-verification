@@ -12,16 +12,19 @@ def find_storage_rate(
     dest_port_type: Optional[str],
     dest_terminal_type: Optional[str],
     tier_number: Optional[int],
+    om_a: Optional[str] = None,
 ) -> dict:
     """
-    5개 키 (ODCY명, odcy터미널구분, ODCY_위치, 포트구분, 터미널구분) 기준으로
+    6개 키 (OM-A, ODCY명, odcy터미널구분, ODCY_위치, 포트구분, 터미널구분) 기준으로
     보관료/상하차료/셔틀비 티어 요율 조회.
-    더 구체적인(필드 수 많은) 레코드 우선 반환.
+    OM-A(odcy_destination_name)가 가장 높은 우선순위로 매칭.
     반환: {"storage_unit": ..., "handling_unit": ..., "shuttle_unit": ...}
     """
     items = data_store.load("storage_rates.json")
 
     def matches(r: dict) -> bool:
+        if om_a and r.get("om_a") and r["om_a"] != om_a:
+            return False
         if odcy_name and r.get("odcy_name") and r["odcy_name"] != odcy_name:
             return False
         if odcy_terminal_type and r.get("odcy_terminal_type") and r["odcy_terminal_type"] != odcy_terminal_type:
@@ -40,6 +43,7 @@ def find_storage_rate(
 
     def specificity(r: dict) -> int:
         score = 0
+        if r.get("om_a"):               score += 8
         if r.get("odcy_name"):           score += 4
         if r.get("odcy_terminal_type"):   score += 2
         if r.get("odcy_location"):        score += 2

@@ -111,7 +111,8 @@ def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, conta
                    odcy_name_resolved=None, odcy_terminal_type=None,
                    odcy_location=None, dest_port_type=None, dest_terminal_type=None,
                    storage_tier_number=None, storage_days=None,
-                   trkv_dest_name=None, trkv_dest_port=None):
+                   trkv_dest_name=None, trkv_dest_port=None,
+                   odcy_destination_name=None):
     """반환: (expected, diff, status, rate_row, unit_rate)"""
     rate_row = None
     unit_rate = None  # 보관료 day당 단가
@@ -124,6 +125,7 @@ def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, conta
         rate = find_storage_rate(
             odcy_name_resolved, odcy_terminal_type, odcy_location,
             dest_port_type, dest_terminal_type, storage_tier_number,
+            om_a=odcy_destination_name,
         )
         rate_row = rate.get("rate_row_num")
         if charge_type == "보관료":
@@ -302,6 +304,7 @@ def run_verification(filename: str, rows: list) -> dict:
                     storage_days=billable_days,
                     trkv_dest_name=trkv_dest_name,
                     trkv_dest_port=trkv_dest_port,
+                    odcy_destination_name=odcy_destination_name,
                 )
             result[actual_key] = actual
             result[exp_key] = expected
