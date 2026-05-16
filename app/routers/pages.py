@@ -41,6 +41,11 @@ def verification_page(request: Request):
     return templates.TemplateResponse("verification.html", {"request": request})
 
 
+@router.get("/checklist")
+def checklist_page(request: Request):
+    return templates.TemplateResponse("checklist.html", {"request": request})
+
+
 @router.get("/rate-register")
 def rate_register_page(request: Request):
     return templates.TemplateResponse("rate_register.html", {"request": request})

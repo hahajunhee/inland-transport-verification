@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% block title %}1단계 체크리스트 검증 - 내륙운송정산검증{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">1단계 - 체크리스트 검증</h1>
+</div>
+
+<!-- 업로드 -->
+<div class="card">
+  <h2 class="card-title">엑셀 파일 업로드</h2>
+  <div id="drop-zone" class="drop-zone">
+    <div class="drop-icon">📋</div>
+    <div class="drop-text">검증 엑셀 파일을 여기에 드래그하거나 클릭하여 선택</div>
+    <div class="drop-sub">지원 형식: .xlsx, .xls</div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" />
+  </div>
+  <div id="file-selected" class="file-selected" style="display:none">
+    <span id="file-name"></span>
+    <button class="btn btn-primary" id="upload-btn" onclick="uploadFile()">검증 시작</button>
+    <button class="btn btn-outline" onclick="resetUpload()">취소</button>
+  </div>
+  <div id="upload-progress" style="display:none">
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="progress-text" id="progress-text">처리 중...</div>
+  </div>
+  <div id="upload-error" class="alert alert-error" style="display:none"></div>
+</div>
+
+<!-- 이전 세션 -->
+<div class="card">
+  <div class="card-header-row">
+    <h2 class="card-title">이전 검증 세션</h2>
+    <select id="session-select" onchange="loadSession(this.value)">
+      <option value="">세션 선택...</option>
+    </select>
+  </div>
+</div>
+
+<!-- 결과 -->
+<div id="result-section" style="display:none">
+
+  <!-- 요약 -->
+  <div class="card">
+    <div class="card-header-row">
+      <h2 class="card-title">검증 요약 <span id="summary-filename" class="filename-badge"></span></h2>
+      <button class="btn btn-primary" onclick="downloadReport()">📥 리포트 다운로드</button>
+    </div>
+    <div class="summary-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
+      <div class="summary-block">
+        <div class="summary-label">총 행수</div>
+        <div class="summary-value" id="s-total">-</div>
+      </div>
+      <div class="summary-block" id="s-total-errors-block">
+        <div class="summary-label">총 오류</div>
+        <div class="summary-value" id="s-total-errors" style="color:#dc2626">-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stage Cards -->
+  <div id="stage-cards"></div>
+
+  <!-- Stage 4: 직상차 -->
+  <div class="card" id="stage4-card">
+    <div class="cl-stage-header" onclick="toggleStage('stage4-body')">
+      <div>
+        <span class="cl-stage-num">Stage 4</span>
+        <span class="cl-stage-title">직상차 체크</span>
+        <span class="cl-stage-desc">직상차 컨테이너의 Waiting (ODCY) 확인</span>
+      </div>
+      <div>
+        <span class="badge" id="s4-badge" style="background:#6b7280;color:#fff">미실행</span>
+        <span class="cl-toggle">▼</span>
+      </div>
+    </div>
+    <div id="stage4-body" class="cl-stage-body" style="display:none">
+      <p style="margin-bottom:8px;color:#666;font-size:13px">
+        직상차 대상 컨테이너 번호를 한 줄에 하나씩 입력하세요. 이 단계는 건너뛸 수 있습니다.
+      </p>
+      <textarea id="stage4-input" rows="6" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;font-size:13px;resize:vertical"
+        placeholder="DYLU2200600&#10;TCLU1369394&#10;..."></textarea>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="runStage4()">확인</button>
+        <button class="btn btn-outline" onclick="skipStage4()">건너뛰기</button>
+      </div>
+      <div id="stage4-result" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- 하단 다운로드 -->
+  <div class="card" style="text-align:center;padding:24px">
+    <button class="btn btn-primary" onclick="downloadReport()" style="font-size:15px;padding:10px 32px">
+      📥 전체 리포트 다운로드 (Excel)
+    </button>
+  </div>
+</div>
+
+<style>
+.cl-stage-header {
+  display:flex; justify-content:space-between; align-items:center;
+  padding:12px 16px; cursor:pointer; border-radius:8px;
+  transition: background .15s;
+}
+.cl-stage-header:hover { background:#f9fafb; }
+.cl-stage-num {
+  display:inline-block; background:#1a73e8; color:#fff; font-size:11px;
+  font-weight:700; padding:2px 8px; border-radius:10px; margin-right:8px;
+}
+.cl-stage-title { font-weight:600; font-size:14px; }
+.cl-stage-desc { color:#6b7280; font-size:12px; margin-left:8px; }
+.cl-toggle { color:#9ca3af; font-size:12px; margin-left:8px; transition:transform .2s; }
+.cl-stage-body { padding:0 16px 16px; }
+
+.cl-error-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+.cl-error-table th {
+  background:#f3f4f6; text-align:left; padding:6px 8px;
+  border-bottom:2px solid #e5e7eb; font-weight:600; white-space:nowrap;
+}
+.cl-error-table td {
+  padding:5px 8px; border-bottom:1px solid #f3f4f6;
+}
+.cl-error-table tr:hover td { background:#fef2f2; }
+.cl-error-table .reason-cell { max-width:400px; word-break:break-all; }
+
+.badge-ok { background:#dcfce7; color:#166534; }
+.badge-error { background:#fee2e2; color:#991b1b; }
+.badge-skip { background:#f3f4f6; color:#6b7280; }
+
+.cl-summary-row {
+  display:flex; gap:12px; align-items:center; padding:8px 16px;
+  font-size:13px; color:#374151;
+}
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const API = '/api/checklist';
+let currentSessionId = null;
+let currentErrors = {};
+
+const STAGE_META = {
+  '1': {name:'필수 항목 공란 체크', desc:'픽업지명/출하지명/ODCY/도착지명/출하일/반입반출일/터미널반입일/선적일/ODCY도착지명 공란 여부'},
+  '2': {name:'리퍼 / DG 체크', desc:'리퍼(RE) → Frozen Container 체크, 전체 → DG여부 공란 확인'},
+  '3': {name:'공휴일 / 주말 체크', desc:'일요일·공휴일 ↔ Weekend/Holiday 정합성'},
+  '4': {name:'직상차 체크', desc:'직상차 컨테이너 Waiting (ODCY) 확인'},
+  '5': {name:'운송유형 / 모드 누락 체크', desc:'운송유형·운송모드 공란 확인'},
+  '6': {name:'왕복 / 편도 체크', desc:'픽업지·도착지 포트존 비교 → 운송유형 정합성'},
+  '7': {name:'일자 순서 체크', desc:'출하일→반입일→반출일→터미널반입일→선적일 순서 확인'},
+};
+
+// ─── 업로드 ────────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+let selectedFile = null;
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) selectFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) selectFile(fileInput.files[0]); });
+
+function selectFile(f) {
+  selectedFile = f;
+  document.getElementById('file-name').textContent = f.name;
+  document.getElementById('file-selected').style.display = 'flex';
+  dropZone.style.display = 'none';
+}
+function resetUpload() {
+  selectedFile = null; fileInput.value = '';
+  document.getElementById('file-selected').style.display = 'none';
+  dropZone.style.display = '';
+  document.getElementById('upload-error').style.display = 'none';
+}
+
+async function uploadFile() {
+  if (!selectedFile) return;
+  const prog = document.getElementById('upload-progress');
+  const errEl = document.getElementById('upload-error');
+  prog.style.display = 'block'; errEl.style.display = 'none';
+  document.getElementById('progress-fill').style.width = '30%';
+  document.getElementById('progress-text').textContent = '파일 분석 중...';
+
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  try {
+    document.getElementById('progress-fill').style.width = '60%';
+    const res = await fetch(API + '/upload', {method:'POST', body:fd});
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || '업로드 실패'); }
+    document.getElementById('progress-fill').style.width = '100%';
+    document.getElementById('progress-text').textContent = '완료!';
+    const data = await res.json();
+    setTimeout(() => { prog.style.display = 'none'; }, 500);
+    displayResults(data);
+    loadSessionList();
+  } catch(e) {
+    prog.style.display = 'none';
+    errEl.textContent = e.message; errEl.style.display = 'block';
+  }
+}
+
+// ─── 세션 목록 ──────────────────────────────────────────
+async function loadSessionList() {
+  try {
+    const res = await fetch(API + '/sessions');
+    const sessions = await res.json();
+    const sel = document.getElementById('session-select');
+    sel.innerHTML = '<option value="">세션 선택...</option>';
+    sessions.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      const dt = s.uploaded_at ? s.uploaded_at.substring(0,16).replace('T',' ') : '';
+      opt.textContent = `#${s.id} ${s.filename} (${dt})`;
+      if (s.id === currentSessionId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } catch(e) {}
+}
+
+async function loadSession(sid) {
+  if (!sid) return;
+  try {
+    const res = await fetch(API + '/sessions');
+    const sessions = await res.json();
+    const session = sessions.find(s => s.id === parseInt(sid));
+    if (!session) return;
+    const data = {
+      session_id: session.id,
+      filename: session.filename,
+      total_rows: session.total_rows,
+      errors: session.errors,
+      error_counts: {},
+    };
+    for (const k of ['1','2','3','4','5','6','7']) {
+      data.error_counts[k] = (session.errors[k] || []).length;
+    }
+    displayResults(data);
+  } catch(e) {}
+}
+
+// ─── 결과 표시 ──────────────────────────────────────────
+function displayResults(data) {
+  currentSessionId = data.session_id;
+  currentErrors = data.errors || {};
+
+  document.getElementById('result-section').style.display = '';
+  document.getElementById('summary-filename').textContent = data.filename;
+  document.getElementById('s-total').textContent = data.total_rows;
+
+  let totalErr = 0;
+  for (const k in (data.error_counts || {})) totalErr += data.error_counts[k];
+  if (data.errors && data.errors['4']) totalErr += data.errors['4'].length;
+  document.getElementById('s-total-errors').textContent = totalErr;
+  const errBlock = document.getElementById('s-total-errors-block');
+  errBlock.className = totalErr > 0 ? 'summary-block summary-diff' : 'summary-block summary-ok';
+
+  // Stage cards (1,2,3,5,6,7)
+  const container = document.getElementById('stage-cards');
+  container.innerHTML = '';
+  for (const stageNum of ['1','2','3','5','6','7']) {
+    const errors = currentErrors[stageNum] || [];
+    const meta = STAGE_META[stageNum];
+    container.appendChild(createStageCard(stageNum, meta, errors));
+  }
+
+  // Stage 4 badge
+  if (currentErrors['4']) {
+    const s4Errors = currentErrors['4'];
+    const badge = document.getElementById('s4-badge');
+    badge.textContent = s4Errors.length > 0 ? `오류 ${s4Errors.length}건` : '정상';
+    badge.className = s4Errors.length > 0 ? 'badge badge-error' : 'badge badge-ok';
+    document.getElementById('stage4-result').innerHTML = renderErrorTable(s4Errors);
+  }
+}
+
+function createStageCard(stageNum, meta, errors) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.padding = '0';
+  card.style.overflow = 'hidden';
+
+  const count = errors.length;
+  const badgeClass = count > 0 ? 'badge-error' : 'badge-ok';
+  const badgeText = count > 0 ? `오류 ${count}건` : '정상';
+  const bodyId = `stage${stageNum}-body-auto`;
+
+  card.innerHTML = `
+    <div class="cl-stage-header" onclick="toggleStage('${bodyId}')">
+      <div>
+        <span class="cl-stage-num">Stage ${stageNum}</span>
+        <span class="cl-stage-title">${meta.name}</span>
+        <span class="cl-stage-desc">${meta.desc}</span>
+      </div>
+      <div>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+        <span class="cl-toggle">▼</span>
+      </div>
+    </div>
+    <div id="${bodyId}" class="cl-stage-body" style="display:${count > 0 ? 'block' : 'none'}">
+      ${count > 0 ? renderErrorTable(errors) : '<p style="color:#16a34a;font-size:13px">오류가 없습니다.</p>'}
+    </div>
+  `;
+  return card;
+}
+
+function renderErrorTable(errors) {
+  if (!errors || errors.length === 0) return '<p style="color:#16a34a;font-size:13px">오류가 없습니다.</p>';
+  let html = `<table class="cl-error-table"><thead><tr>
+    <th>행번호</th><th>컨테이너번호</th><th>열</th><th>현재값</th><th>오류 사유</th>
+  </tr></thead><tbody>`;
+  const maxShow = 200;
+  const showErrors = errors.slice(0, maxShow);
+  for (const e of showErrors) {
+    html += `<tr>
+      <td>${e.row_number || '-'}</td>
+      <td>${e.container_no || '-'}</td>
+      <td>${e.column || ''}</td>
+      <td>${e.value || ''}</td>
+      <td class="reason-cell">${e.reason || ''}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  if (errors.length > maxShow) {
+    html += `<p style="color:#6b7280;font-size:12px;margin-top:4px">... 외 ${errors.length - maxShow}건 (리포트 다운로드에서 전체 확인)</p>`;
+  }
+  return html;
+}
+
+function toggleStage(bodyId) {
+  const el = document.getElementById(bodyId);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ─── Stage 4 ────────────────────────────────────────────
+async function runStage4() {
+  if (!currentSessionId) return alert('먼저 파일을 업로드하세요.');
+  const text = document.getElementById('stage4-input').value.trim();
+  if (!text) return alert('컨테이너 번호를 입력하세요.');
+  const numbers = text.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+
+  try {
+    const res = await fetch(API + `/stage4/${currentSessionId}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({container_numbers: numbers}),
+    });
+    if (!res.ok) throw new Error('Stage 4 검증 실패');
+    const data = await res.json();
+    currentErrors['4'] = data.errors;
+
+    const badge = document.getElementById('s4-badge');
+    if (data.errors.length > 0) {
+      badge.textContent = `오류 ${data.errors.length}건`;
+      badge.className = 'badge badge-error';
+    } else {
+      badge.textContent = `정상 (${data.total_containers}건 확인)`;
+      badge.className = 'badge badge-ok';
+    }
+    document.getElementById('stage4-result').innerHTML = renderErrorTable(data.errors);
+
+    // Update total errors
+    let total = 0;
+    for (const k in currentErrors) total += (currentErrors[k] || []).length;
+    document.getElementById('s-total-errors').textContent = total;
+  } catch(e) { alert(e.message); }
+}
+
+function skipStage4() {
+  const badge = document.getElementById('s4-badge');
+  badge.textContent = '건너뜀';
+  badge.className = 'badge badge-skip';
+  document.getElementById('stage4-result').innerHTML = '<p style="color:#6b7280;font-size:13px">이 단계를 건너뛰었습니다.</p>';
+}
+
+// ─── 리포트 다운로드 ────────────────────────────────────
+function downloadReport() {
+  if (!currentSessionId) return alert('먼저 파일을 업로드하세요.');
+  window.location.href = API + `/download/${currentSessionId}`;
+}
+
+// ─── 초기화 ─────────────────────────────────────────────
+loadSessionList();
+</script>
+{% endblock %}

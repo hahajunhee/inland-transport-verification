@@ -1,0 +1,82 @@
+"""
+1단계 체크리스트 검증 API 라우터
+"""
+from io import BytesIO
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+from app.services.checklist_service import (
+    parse_checklist_excel,
+    run_checklist,
+    run_stage4,
+    get_session,
+    list_sessions,
+    generate_checklist_report,
+    STAGE_NAMES,
+)
+
+router = APIRouter()
+
+
+@router.post("/upload")
+async def upload_checklist(file: UploadFile = File(...)):
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(400, "엑셀 파일(.xlsx, .xls)만 지원합니다.")
+    try:
+        content = await file.read()
+        rows = parse_checklist_excel(content)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"파일 파싱 실패: {e}")
+
+    session = run_checklist(file.filename, rows)
+
+    error_counts = {}
+    for stage_num in ("1", "2", "3", "5", "6", "7"):
+        error_counts[stage_num] = len(session["errors"].get(stage_num, []))
+
+    return {
+        "session_id": session["id"],
+        "filename": session["filename"],
+        "total_rows": session["total_rows"],
+        "error_counts": error_counts,
+        "errors": session["errors"],
+        "stage_names": STAGE_NAMES,
+    }
+
+
+class Stage4Request(BaseModel):
+    container_numbers: list[str]
+
+
+@router.post("/stage4/{session_id}")
+async def check_stage4(session_id: int, body: Stage4Request):
+    errors = run_stage4(session_id, body.container_numbers)
+    return {
+        "errors": errors,
+        "count": len(errors),
+        "total_containers": len([c for c in body.container_numbers if c.strip()]),
+    }
+
+
+@router.get("/sessions")
+def get_sessions():
+    return list_sessions()
+
+
+@router.get("/download/{session_id}")
+def download_report(session_id: int):
+    session = get_session(session_id)
+    if not session:
+        raise HTTPException(404, "세션을 찾을 수 없습니다.")
+
+    report = generate_checklist_report(session)
+    filename = f"체크리스트검증_{session.get('filename', 'report')}.xlsx"
+
+    return StreamingResponse(
+        BytesIO(report),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+    )
