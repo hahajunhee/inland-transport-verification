@@ -141,7 +141,12 @@
 .cl-toggle { color:#9ca3af; font-size:12px; margin-left:8px; transition:transform .2s; }
 .cl-stage-body { padding:0 16px 16px; }
 
-.cl-error-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+.cl-error-scroll {
+  max-height:400px; overflow-y:auto; margin-top:8px;
+  border:1px solid #e5e7eb; border-radius:6px;
+}
+.cl-error-table { width:100%; border-collapse:collapse; font-size:12px; }
+.cl-error-table thead { position:sticky; top:0; z-index:1; }
 .cl-error-table th {
   background:#f3f4f6; text-align:left; padding:6px 8px;
   border-bottom:2px solid #e5e7eb; font-weight:600; white-space:nowrap;
@@ -355,12 +360,10 @@ function createStageCard(stageNum, meta, errors) {
 
 function renderErrorTable(errors) {
   if (!errors || errors.length === 0) return '<p style="color:#16a34a;font-size:13px">오류가 없습니다.</p>';
-  let html = `<table class="cl-error-table"><thead><tr>
+  let html = `<div class="cl-error-scroll"><table class="cl-error-table"><thead><tr>
     <th>행번호</th><th>컨테이너번호</th><th>열</th><th>현재값</th><th>오류 사유</th>
   </tr></thead><tbody>`;
-  const maxShow = 200;
-  const showErrors = errors.slice(0, maxShow);
-  for (const e of showErrors) {
+  for (const e of errors) {
     html += `<tr>
       <td>${e.row_number || '-'}</td>
       <td>${e.container_no || '-'}</td>
@@ -369,10 +372,7 @@ function renderErrorTable(errors) {
       <td class="reason-cell">${e.reason || ''}</td>
     </tr>`;
   }
-  html += '</tbody></table>';
-  if (errors.length > maxShow) {
-    html += `<p style="color:#6b7280;font-size:12px;margin-top:4px">... 외 ${errors.length - maxShow}건 (리포트 다운로드에서 전체 확인)</p>`;
-  }
+  html += '</tbody></table></div>';
   return html;
 }
 
