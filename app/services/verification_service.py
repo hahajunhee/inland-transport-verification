@@ -209,8 +209,11 @@ def run_verification(filename: str, rows: list) -> dict:
 
         # TRKV용 ODCY도착지명: OM-D 값 표시
         trkv_dest_name         = om_d
-        # TRKV용 도착포트: OM-D 값 기준으로만 매핑 (OM-D가 없으면 None)
+        # TRKV용 도착포트: OM-D 값 기준으로 매핑
         trkv_dest_port         = _resolve_dest_port_by_omd(om_d)
+        # 직반입건(상세ODCY 공란): 도착지명 → 포트명매핑(PM-A→PM-B) 폴백
+        if trkv_dest_port is None and (not odcy_destination_name or str(odcy_destination_name).strip() == ""):
+            trkv_dest_port = resolve_port(dest_name)
         dest_port_type         = resolve_port(dest_name)
         dest_terminal_type     = resolve_port_terminal_type(dest_name)
 
