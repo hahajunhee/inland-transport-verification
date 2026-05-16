@@ -27,6 +27,35 @@
   <div id="upload-error" class="alert alert-error" style="display:none"></div>
 </div>
 
+<!-- 휴일 설정 (Stage 3용) -->
+<div class="card">
+  <div class="card-header-row">
+    <h2 class="card-title">공휴일 설정 <span style="font-size:12px;color:#6b7280;font-weight:400">(Stage 3 검증에 사용)</span></h2>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="holiday-count" style="font-size:13px;color:#6b7280">0일 지정</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <button class="btn btn-outline" onclick="calPrevMonth()" style="padding:4px 10px">&lt;</button>
+        <span id="cal-title" style="font-weight:600;font-size:14px;min-width:120px;text-align:center"></span>
+        <button class="btn btn-outline" onclick="calNextMonth()" style="padding:4px 10px">&gt;</button>
+      </div>
+      <table class="cal-table" id="cal-table"></table>
+    </div>
+    <div style="flex:1;min-width:200px">
+      <p style="font-size:12px;color:#6b7280;margin-bottom:8px">
+        날짜를 클릭하면 공휴일로 지정/해제됩니다.<br>
+        일요일은 자동 체크되므로 별도 지정 불필요합니다.<br>
+        토요일은 공휴일이 아닙니다.
+      </p>
+      <div id="holiday-list" style="max-height:180px;overflow-y:auto;font-size:12px;border:1px solid #e5e7eb;border-radius:6px;padding:8px"></div>
+      <button class="btn btn-outline" onclick="clearAllHolidays()" style="margin-top:8px;font-size:12px">전체 초기화</button>
+    </div>
+  </div>
+</div>
+
 <!-- 이전 세션 -->
 <div class="card">
   <div class="card-header-row">
@@ -131,6 +160,22 @@
   display:flex; gap:12px; align-items:center; padding:8px 16px;
   font-size:13px; color:#374151;
 }
+
+/* ─── 캘린더 ─── */
+.cal-table { border-collapse:collapse; user-select:none; }
+.cal-table th {
+  font-size:11px; color:#6b7280; padding:4px 0; text-align:center; width:36px;
+}
+.cal-table td {
+  width:36px; height:32px; text-align:center; font-size:12px;
+  border-radius:6px; cursor:pointer; transition: background .1s;
+}
+.cal-table td:hover { background:#e5e7eb; }
+.cal-table td.cal-empty { cursor:default; }
+.cal-table td.cal-empty:hover { background:transparent; }
+.cal-table td.cal-sun { color:#dc2626; }
+.cal-table td.cal-holiday { background:#fecaca; color:#991b1b; font-weight:700; }
+.cal-table td.cal-today { outline:2px solid #1a73e8; outline-offset:-2px; }
 </style>
 
 {% endblock %}
@@ -383,7 +428,128 @@ function downloadReport() {
   window.location.href = API + `/download/${currentSessionId}`;
 }
 
+// ─── 캘린더 (휴일 설정) ──────────────────────────────────
+let calYear, calMonth; // 0-indexed month
+let userHolidays = new Set();
+
+function initCalendar() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  loadHolidays();
+}
+
+async function loadHolidays() {
+  try {
+    const res = await fetch(API + '/holidays');
+    const dates = await res.json();
+    userHolidays = new Set(dates);
+  } catch(e) { userHolidays = new Set(); }
+  renderCalendar();
+  renderHolidayList();
+}
+
+async function saveHolidays() {
+  const dates = Array.from(userHolidays).sort();
+  try {
+    await fetch(API + '/holidays', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({dates}),
+    });
+  } catch(e) {}
+  renderHolidayList();
+}
+
+function renderCalendar() {
+  const table = document.getElementById('cal-table');
+  const title = document.getElementById('cal-title');
+  title.textContent = `${calYear}년 ${calMonth + 1}월`;
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  let html = '<thead><tr><th>일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th></tr></thead><tbody><tr>';
+  for (let i = 0; i < firstDay; i++) html += '<td class="cal-empty"></td>';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dow = (firstDay + d - 1) % 7;
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isSun = dow === 0;
+    const isHol = userHolidays.has(ds);
+    const isToday = ds === todayStr;
+
+    let cls = [];
+    if (isSun) cls.push('cal-sun');
+    if (isHol) cls.push('cal-holiday');
+    if (isToday) cls.push('cal-today');
+
+    html += `<td class="${cls.join(' ')}" data-date="${ds}" onclick="toggleHoliday('${ds}')">${d}</td>`;
+    if (dow === 6 && d < daysInMonth) html += '</tr><tr>';
+  }
+  html += '</tr></tbody>';
+  table.innerHTML = html;
+
+  document.getElementById('holiday-count').textContent = `${userHolidays.size}일 지정`;
+}
+
+function renderHolidayList() {
+  const el = document.getElementById('holiday-list');
+  const sorted = Array.from(userHolidays).sort();
+  if (sorted.length === 0) {
+    el.innerHTML = '<span style="color:#9ca3af">지정된 공휴일이 없습니다</span>';
+    return;
+  }
+  const dayNames = ['일','월','화','수','목','금','토'];
+  el.innerHTML = sorted.map(ds => {
+    const dt = new Date(ds + 'T00:00:00');
+    const dn = dayNames[dt.getDay()];
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">
+      <span>${ds} (${dn})</span>
+      <span style="cursor:pointer;color:#dc2626;font-size:11px" onclick="removeHoliday('${ds}')">&times;</span>
+    </div>`;
+  }).join('');
+  document.getElementById('holiday-count').textContent = `${userHolidays.size}일 지정`;
+}
+
+function toggleHoliday(ds) {
+  // 일요일은 토글 불필요 (자동 체크)
+  const dt = new Date(ds + 'T00:00:00');
+  if (dt.getDay() === 0) return;
+  if (userHolidays.has(ds)) userHolidays.delete(ds);
+  else userHolidays.add(ds);
+  saveHolidays();
+  renderCalendar();
+}
+
+function removeHoliday(ds) {
+  userHolidays.delete(ds);
+  saveHolidays();
+  renderCalendar();
+}
+
+function clearAllHolidays() {
+  if (!confirm('모든 공휴일 지정을 초기화하시겠습니까?')) return;
+  userHolidays.clear();
+  saveHolidays();
+  renderCalendar();
+}
+
+function calPrevMonth() {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+function calNextMonth() {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+
 // ─── 초기화 ─────────────────────────────────────────────
+initCalendar();
 loadSessionList();
 </script>
 {% endblock %}

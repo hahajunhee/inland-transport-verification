@@ -4,7 +4,6 @@
 """
 import json
 import pandas as pd
-import holidays
 from io import BytesIO
 from datetime import datetime, date
 from pathlib import Path
@@ -54,23 +53,39 @@ CHECKLIST_COLUMN_MAP = {
 # ─── 데이터 저장 경로 ──────────────────────────────────────────────────
 CHECKLIST_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "checklist"
 
-# ─── 한국 공휴일 ───────────────────────────────────────────────────────
-_kr_holidays_cache: dict[int, holidays.HolidayBase] = {}
+# ─── 유저 정의 휴일 ───────────────────────────────────────────────────
+HOLIDAYS_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "user_holidays.json"
 
 
-def _get_kr_holidays(year: int) -> holidays.HolidayBase:
-    if year not in _kr_holidays_cache:
-        _kr_holidays_cache[year] = holidays.KR(years=year)
-    return _kr_holidays_cache[year]
+def load_user_holidays() -> list[str]:
+    if not HOLIDAYS_PATH.exists():
+        return []
+    try:
+        return json.loads(HOLIDAYS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_user_holidays(dates: list[str]):
+    HOLIDAYS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    HOLIDAYS_PATH.write_text(json.dumps(sorted(set(dates)), ensure_ascii=False), encoding="utf-8")
 
 
 def _is_holiday_or_sunday(d: date) -> tuple[bool, str]:
     if d.weekday() == 6:
         return True, "일요일"
-    h = _get_kr_holidays(d.year)
-    if d in h:
-        return True, f"공휴일({h.get(d)})"
+    ds = d.isoformat()
+    if ds in _holiday_set:
+        return True, "공휴일(사용자 지정)"
     return False, ""
+
+
+_holiday_set: set[str] = set()
+
+
+def _refresh_holiday_set():
+    global _holiday_set
+    _holiday_set = set(load_user_holidays())
 
 
 # ─── 파싱 ──────────────────────────────────────────────────────────────
@@ -404,6 +419,7 @@ def check_stage7(rows: list[dict]) -> list[dict]:
 # ─── 전체 검증 실행 ───────────────────────────────────────────────────
 
 def run_checklist(filename: str, rows: list[dict]) -> dict:
+    _refresh_holiday_set()
     errors = {
         "1": check_stage1(rows),
         "2": check_stage2(rows),

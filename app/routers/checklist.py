@@ -13,6 +13,8 @@ from app.services.checklist_service import (
     get_session,
     list_sessions,
     generate_checklist_report,
+    load_user_holidays,
+    save_user_holidays,
     STAGE_NAMES,
 )
 
@@ -64,6 +66,22 @@ async def check_stage4(session_id: int, body: Stage4Request):
 @router.get("/sessions")
 def get_sessions():
     return list_sessions()
+
+
+# ─── 휴일 관리 ────────────────────────────────────────────
+@router.get("/holidays")
+def get_holidays():
+    return load_user_holidays()
+
+
+class HolidaysRequest(BaseModel):
+    dates: list[str]
+
+
+@router.post("/holidays")
+def set_holidays(body: HolidaysRequest):
+    save_user_holidays(body.dates)
+    return {"count": len(body.dates), "dates": sorted(set(body.dates))}
 
 
 @router.get("/download/{session_id}")
