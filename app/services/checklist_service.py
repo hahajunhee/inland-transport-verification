@@ -141,7 +141,7 @@ def parse_checklist_excel(file_bytes: bytes) -> list[dict]:
         if not pickup:
             continue
 
-        row["row_number"] = int(idx) + int(header_row_idx) + 2
+        row["row_number"] = int(idx) + int(header_row_idx) + 1
         rows.append(row)
 
     return rows

@@ -2,6 +2,7 @@
 1단계 체크리스트 검증 API 라우터
 """
 from io import BytesIO
+from urllib.parse import quote
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -90,11 +91,16 @@ def download_report(session_id: int):
     if not session:
         raise HTTPException(404, "세션을 찾을 수 없습니다.")
 
-    report = generate_checklist_report(session)
-    filename = f"체크리스트검증_{session.get('filename', 'report')}.xlsx"
+    try:
+        report = generate_checklist_report(session)
+    except Exception as e:
+        raise HTTPException(500, f"리포트 생성 실패: {e}")
+
+    raw_name = session.get("filename", "report")
+    filename = f"체크리스트검증_{raw_name}.xlsx"
 
     return StreamingResponse(
         BytesIO(report),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
     )
