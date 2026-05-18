@@ -104,9 +104,7 @@
       </div>
     </div>
     <div id="stage4-body" class="cl-stage-body" style="display:none">
-      <p style="margin-bottom:8px;color:#666;font-size:13px">
-        직상차 대상 컨테이너 번호를 한 줄에 하나씩 입력하세요. 이 단계는 건너뛸 수 있습니다.
-      </p>
+      <div class="cl-logic-box"><b>사용자가 직상차 컨테이너 번호를 입력</b> → 검증파일의 "Container No." 열에서 검색<br>해당 행의 <b>Waiting (ODCY) 열이 "X"</b>가 아니면 오류<br>※ 이 단계는 선택사항으로 건너뛸 수 있음</div>
       <textarea id="stage4-input" rows="6" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;font-size:13px;resize:vertical"
         placeholder="DYLU2200600&#10;TCLU1369394&#10;..."></textarea>
       <div style="margin-top:8px;display:flex;gap:8px">
@@ -140,6 +138,12 @@
 .cl-stage-desc { color:#6b7280; font-size:12px; margin-left:8px; }
 .cl-toggle { color:#9ca3af; font-size:12px; margin-left:8px; transition:transform .2s; }
 .cl-stage-body { padding:0 16px 16px; }
+.cl-logic-box {
+  background:#f9fafb; border:1px solid #e5e7eb; border-radius:6px;
+  padding:10px 14px; margin-bottom:10px; font-size:12px; line-height:1.7;
+  color:#6b7280; white-space:pre-line;
+}
+.cl-logic-box b { color:#374151; }
 
 .cl-error-scroll {
   max-height:400px; overflow-y:auto; margin-top:8px;
@@ -192,13 +196,61 @@ let currentSessionId = null;
 let currentErrors = {};
 
 const STAGE_META = {
-  '1': {name:'필수 항목 공란 체크', desc:'픽업지명/출하지명/ODCY/도착지명/출하일/반입반출일/터미널반입일/선적일/ODCY도착지명 공란 여부'},
-  '2': {name:'리퍼 / DG 체크', desc:'리퍼(RE) → Frozen Container 체크, 전체 → DG여부 공란 확인'},
-  '3': {name:'공휴일 / 주말 체크', desc:'일요일·공휴일 ↔ Weekend/Holiday 정합성'},
-  '4': {name:'직상차 체크', desc:'직상차 컨테이너 Waiting (ODCY) 확인'},
-  '5': {name:'운송유형 / 모드 누락 체크', desc:'운송유형·운송모드 공란 확인'},
-  '6': {name:'왕복 / 편도 체크', desc:'픽업지·도착지 포트존 비교 → 운송유형 정합성'},
-  '7': {name:'일자 순서 체크', desc:'출하일→반입일→반출일→터미널반입일→선적일 순서 확인'},
+  '1': {
+    name:'필수 항목 공란 체크',
+    desc:'필수 열 공란 여부 + PORT_DRT 예외 처리',
+    logic: `<b>항상 필수:</b> 픽업지명, 출하지명, 도착지명, 출하일, 터미널 반입일, 선적일 → 공란이면 오류
+<b>ODCY ≠ PORT_DRT일 때 추가 필수:</b> 상세 ODCY, ODCY 반입일, ODCY 반출일, ODCY 도착지명 → 공란이면 오류
+<b>ODCY = PORT_DRT(직반입)일 때:</b> 상세 ODCY, ODCY 반입일, ODCY 반출일, ODCY 도착지명 → 값이 있으면 오류`
+  },
+  '2': {
+    name:'리퍼 / DG 체크',
+    desc:'Frozen Container 체크 및 DG여부 공란 확인',
+    logic: `<b>리퍼 체크:</b> Cont.Category = "RE"인 행 → Frozen Container 열이 "X"가 아니면 오류
+<b>DG 체크:</b> 모든 행 → D/G여부 열이 공란이 아니면 오류`
+  },
+  '3': {
+    name:'공휴일 / 주말 체크',
+    desc:'일요일·공휴일 ↔ Weekend/Holiday 정합성',
+    logic: `<b>출하일이 일요일 또는 사용자 지정 공휴일:</b> Weekend/Holiday가 "X"가 아니면 오류
+<b>출하일이 평일(일요일·공휴일 아님):</b> Weekend/Holiday가 "X"이면 오류
+※ 토요일은 공휴일로 취급하지 않음. 공휴일은 상단 캘린더에서 사용자가 직접 지정`
+  },
+  '4': {
+    name:'직상차 체크',
+    desc:'직상차 컨테이너 Waiting (ODCY) 확인',
+    logic: `<b>사용자가 직상차 컨테이너 번호를 입력</b> → 검증파일의 "Container No." 열에서 검색
+해당 행의 <b>Waiting (ODCY) 열이 "X"</b>가 아니면 오류
+※ 이 단계는 선택사항으로 건너뛸 수 있음`
+  },
+  '5': {
+    name:'운송유형 / 모드 누락 체크',
+    desc:'운송유형·운송모드 공란 확인',
+    logic: `<b>운송유형</b> 열이 공란인 행 → 오류
+<b>운송모드</b> 열이 공란인 행 → 오류`
+  },
+  '6': {
+    name:'왕복 / 편도 체크',
+    desc:'픽업지·도착지 포트존 비교 → 운송유형 정합성',
+    logic: `<b>[ODCY도착지명이 공란인 경우 — 기존 방식]</b>
+  픽업지명 → 포트명매핑 PM-A→PM-B, 도착지명 → 포트명매핑 PM-A→PM-B
+  PM-B가 동일하면 "왕복", 상이하면 "편도"
+
+<b>[ODCY도착지명이 있는 경우 — OM-D 기반]</b>
+  픽업지명 → 포트명매핑 PM-A→PM-B
+  ODCY도착지명 → ODCY매핑 OM-A 매칭 → OM-D 조회
+  OM-D를 포트 변환 (KRPUSN/PUSN16/PUSN7 → 부산신항, 그 외 → 부산북항)
+  픽업 PM-B와 OM-D 포트가 동일하면 "왕복", 상이하면 "편도"
+
+<b>운송유형 열 값과 비교하여 불일치 시 오류</b>`
+  },
+  '7': {
+    name:'일자 순서 체크',
+    desc:'출하일→반입일→반출일→터미널반입일→선적일 순서 확인',
+    logic: `<b>날짜 순서:</b> 출하일 ≤ ODCY 반입일 ≤ ODCY 반출일 ≤ 터미널 반입일 ≤ 선적일
+이전 단계 날짜보다 이후 단계 날짜가 더 이전이면 오류
+※ 공란인 날짜는 건너뛰고 다음 날짜와 비교 (예: 출하일 4/24, 반입일 공란, 터미널반입일 4/25 → 정상)`
+  },
 };
 
 // ─── 업로드 ────────────────────────────────────────────
@@ -352,6 +404,7 @@ function createStageCard(stageNum, meta, errors) {
       </div>
     </div>
     <div id="${bodyId}" class="cl-stage-body" style="display:${count > 0 ? 'block' : 'none'}">
+      <div class="cl-logic-box">${meta.logic || ''}</div>
       ${count > 0 ? renderErrorTable(errors) : '<p style="color:#16a34a;font-size:13px">오류가 없습니다.</p>'}
     </div>
   `;

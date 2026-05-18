@@ -336,6 +336,7 @@ def check_stage5(rows: list[dict]) -> list[dict]:
 # ─── Stage 6: 왕복/편도 체크 ──────────────────────────────────────────
 
 def _resolve_port_type(name: str) -> tuple[Optional[str], bool]:
+    """포트명매핑: excel_name(PM-A) → port_type(PM-B). 반환: (PM-B, found)"""
     if not name:
         return None, False
     name = name.strip()
@@ -346,23 +347,71 @@ def _resolve_port_type(name: str) -> tuple[Optional[str], bool]:
     return None, False
 
 
+def _resolve_om_d(odcy_dest_name: str) -> Optional[str]:
+    """ODCY매핑: odcy_destination_name(OM-A) → odcy_location(OM-D)"""
+    if not odcy_dest_name:
+        return None
+    name = odcy_dest_name.strip()
+    if not name:
+        return None
+    items = data_store.load("odcy_mappings.json")
+    for m in items:
+        if m.get("odcy_destination_name") == name:
+            loc = m.get("odcy_location") or ""
+            return loc.strip() if loc.strip() else None
+    return None
+
+
+_SINPORT_OMD = {"KRPUSN", "PUSN16", "PUSN7"}
+
+
+def _om_d_to_port(om_d: str) -> str:
+    """OM-D 코드 → 포트구분 (KRPUSN/PUSN16/PUSN7→부산신항, 그 외→부산북항)"""
+    if om_d and om_d.strip() in _SINPORT_OMD:
+        return "부산신항"
+    return "부산북항"
+
+
 def check_stage6(rows: list[dict]) -> list[dict]:
     errors = []
     for row in rows:
         pickup_name = row.get("pickup_name")
+        odcy_dest_name = row.get("odcy_destination_name")
         dest_name = row.get("dest_name")
         transport_type = (row.get("transport_type") or "").strip()
 
-        if not pickup_name or not dest_name:
+        if not pickup_name:
             continue
 
         pickup_zone, p_found = _resolve_port_type(pickup_name)
-        dest_zone, d_found = _resolve_port_type(dest_name)
-
-        if not p_found or not d_found:
+        if not p_found:
             continue
 
-        expected = "왕복" if pickup_zone == dest_zone else "편도"
+        has_odcy_dest = odcy_dest_name and str(odcy_dest_name).strip() != ""
+
+        if has_odcy_dest:
+            # ODCY도착지명 있음 → OM-A매칭 → OM-D → 포트변환 후 비교
+            om_d = _resolve_om_d(odcy_dest_name)
+            if om_d is None:
+                continue  # ODCY매핑에 없으면 스킵
+            dest_port = _om_d_to_port(om_d)
+            expected = "왕복" if pickup_zone == dest_port else "편도"
+            detail = (
+                f"픽업지({pickup_name})→PM-B:{pickup_zone}, "
+                f"ODCY도착지명({odcy_dest_name})→OM-D:{om_d}→{dest_port}"
+            )
+        else:
+            # ODCY도착지명 공란 → 기존 방식: 도착지명 PM-B 비교
+            if not dest_name:
+                continue
+            dest_zone, d_found = _resolve_port_type(dest_name)
+            if not d_found:
+                continue
+            expected = "왕복" if pickup_zone == dest_zone else "편도"
+            detail = (
+                f"픽업지({pickup_name})→PM-B:{pickup_zone}, "
+                f"도착지({dest_name})→PM-B:{dest_zone}"
+            )
 
         if transport_type != expected:
             errors.append({
@@ -370,11 +419,7 @@ def check_stage6(rows: list[dict]) -> list[dict]:
                 "container_no": row.get("container_no"),
                 "column": "운송유형",
                 "value": transport_type or "(공란)",
-                "reason": (
-                    f"픽업지({pickup_name})→{pickup_zone}, "
-                    f"도착지({dest_name})→{dest_zone} → "
-                    f"'{expected}'이어야 하는데 '{transport_type}'입니다"
-                ),
+                "reason": f"{detail} → '{expected}'이어야 하는데 '{transport_type}'입니다",
             })
 
     return errors
