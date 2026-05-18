@@ -279,6 +279,8 @@ def check_stage3(rows: list[dict]) -> list[dict]:
 # ─── Stage 4: 직상차 체크 ─────────────────────────────────────────────
 
 def check_stage4(rows: list[dict], container_numbers: list[str]) -> list[dict]:
+    cn_set = {cn.strip().upper() for cn in container_numbers if cn.strip()}
+
     cn_map: dict[str, list[dict]] = {}
     for row in rows:
         cn = (row.get("container_no") or "").strip().upper()
@@ -286,11 +288,9 @@ def check_stage4(rows: list[dict], container_numbers: list[str]) -> list[dict]:
             cn_map.setdefault(cn, []).append(row)
 
     errors = []
-    for cn_raw in container_numbers:
-        cn = cn_raw.strip().upper()
-        if not cn:
-            continue
 
+    # 1) 입력한 컨테이너 → Waiting (ODCY)가 X가 아니면 오류
+    for cn in cn_set:
         if cn not in cn_map:
             errors.append({
                 "row_number": None,
@@ -311,6 +311,21 @@ def check_stage4(rows: list[dict], container_numbers: list[str]) -> list[dict]:
                     "value": waiting or "(공란)",
                     "reason": "직상차 컨테이너인데 Waiting (ODCY)가 'X'가 아닙니다",
                 })
+
+    # 2) 입력하지 않은 컨테이너인데 Waiting (ODCY)가 X인 행 → 오류
+    for row in rows:
+        cn = (row.get("container_no") or "").strip().upper()
+        if not cn or cn in cn_set:
+            continue
+        waiting = (row.get("waiting_odcy") or "").strip().upper()
+        if waiting == "X":
+            errors.append({
+                "row_number": row["row_number"],
+                "container_no": cn,
+                "column": "Waiting (ODCY)",
+                "value": "X",
+                "reason": "직상차 목록에 없는 컨테이너인데 Waiting (ODCY)가 'X'로 체크되어 있습니다",
+            })
 
     return errors
 

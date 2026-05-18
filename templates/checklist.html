@@ -104,7 +104,7 @@
       </div>
     </div>
     <div id="stage4-body" class="cl-stage-body" style="display:none">
-      <div class="cl-logic-box"><b>사용자가 직상차 컨테이너 번호를 입력</b> → 검증파일의 "Container No." 열에서 검색<br>해당 행의 <b>Waiting (ODCY) 열이 "X"</b>가 아니면 오류<br>※ 이 단계는 선택사항으로 건너뛸 수 있음</div>
+      <div class="cl-logic-box"><b>① 입력한 컨테이너:</b> 검증파일의 "Container No." 열에서 검색 → Waiting (ODCY) 열이 "X"가 아니면 오류<br><b>② 입력하지 않은 컨테이너:</b> Waiting (ODCY) 열이 "X"로 체크되어 있으면 오류 (직상차 목록에 없는데 체크됨)<br>※ 이 단계는 선택사항으로 건너뛸 수 있음</div>
       <textarea id="stage4-input" rows="6" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;font-size:13px;resize:vertical"
         placeholder="DYLU2200600&#10;TCLU1369394&#10;..."></textarea>
       <div style="margin-top:8px;display:flex;gap:8px">
@@ -219,8 +219,8 @@ const STAGE_META = {
   '4': {
     name:'직상차 체크',
     desc:'직상차 컨테이너 Waiting (ODCY) 확인',
-    logic: `<b>사용자가 직상차 컨테이너 번호를 입력</b> → 검증파일의 "Container No." 열에서 검색
-해당 행의 <b>Waiting (ODCY) 열이 "X"</b>가 아니면 오류
+    logic: `<b>① 입력한 컨테이너:</b> 검증파일의 "Container No." 열에서 검색 → Waiting (ODCY) 열이 "X"가 아니면 오류
+<b>② 입력하지 않은 컨테이너:</b> Waiting (ODCY) 열이 "X"로 체크되어 있으면 오류 (직상차 목록에 없는데 체크됨)
 ※ 이 단계는 선택사항으로 건너뛸 수 있음`
   },
   '5': {
