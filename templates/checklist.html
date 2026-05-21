@@ -90,28 +90,28 @@
   <!-- Stage Cards -->
   <div id="stage-cards"></div>
 
-  <!-- Stage 4: 직상차 -->
-  <div class="card" id="stage4-card">
-    <div class="cl-stage-header" onclick="toggleStage('stage4-body')">
+  <!-- Stage 7: 직상차 -->
+  <div class="card" id="stage7-card">
+    <div class="cl-stage-header" onclick="toggleStage('stage7-body')">
       <div>
-        <span class="cl-stage-num">Stage 4</span>
+        <span class="cl-stage-num">Stage 7</span>
         <span class="cl-stage-title">직상차 체크</span>
         <span class="cl-stage-desc">직상차 컨테이너의 Waiting (ODCY) 확인</span>
       </div>
       <div>
-        <span class="badge" id="s4-badge" style="background:#6b7280;color:#fff">미실행</span>
+        <span class="badge" id="s7-badge" style="background:#6b7280;color:#fff">미실행</span>
         <span class="cl-toggle">▼</span>
       </div>
     </div>
-    <div id="stage4-body" class="cl-stage-body" style="display:none">
+    <div id="stage7-body" class="cl-stage-body" style="display:none">
       <div class="cl-logic-box"><b>① 입력한 컨테이너:</b> 검증파일의 "Container No." 열에서 검색 → Waiting (ODCY) 열이 "X"가 아니면 오류<br><b>② 입력하지 않은 컨테이너:</b> Waiting (ODCY) 열이 "X"로 체크되어 있으면 오류 (직상차 목록에 없는데 체크됨)<br>※ 이 단계는 선택사항으로 건너뛸 수 있음</div>
-      <textarea id="stage4-input" rows="6" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;font-size:13px;resize:vertical"
+      <textarea id="stage7-input" rows="6" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-family:monospace;font-size:13px;resize:vertical"
         placeholder="DYLU2200600&#10;TCLU1369394&#10;..."></textarea>
       <div style="margin-top:8px;display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="runStage4()">확인</button>
-        <button class="btn btn-outline" onclick="skipStage4()">건너뛰기</button>
+        <button class="btn btn-primary" onclick="runStage7()">확인</button>
+        <button class="btn btn-outline" onclick="skipStage7()">건너뛰기</button>
       </div>
-      <div id="stage4-result" style="margin-top:12px"></div>
+      <div id="stage7-result" style="margin-top:12px"></div>
     </div>
   </div>
 
@@ -217,19 +217,12 @@ const STAGE_META = {
 ※ 토요일은 공휴일로 취급하지 않음. 공휴일은 상단 캘린더에서 사용자가 직접 지정`
   },
   '4': {
-    name:'직상차 체크',
-    desc:'직상차 컨테이너 Waiting (ODCY) 확인',
-    logic: `<b>① 입력한 컨테이너:</b> 검증파일의 "Container No." 열에서 검색 → Waiting (ODCY) 열이 "X"가 아니면 오류
-<b>② 입력하지 않은 컨테이너:</b> Waiting (ODCY) 열이 "X"로 체크되어 있으면 오류 (직상차 목록에 없는데 체크됨)
-※ 이 단계는 선택사항으로 건너뛸 수 있음`
-  },
-  '5': {
     name:'운송유형 / 모드 누락 체크',
     desc:'운송유형·운송모드 공란 확인',
     logic: `<b>운송유형</b> 열이 공란인 행 → 오류
 <b>운송모드</b> 열이 공란인 행 → 오류`
   },
-  '6': {
+  '5': {
     name:'왕복 / 편도 체크',
     desc:'픽업지·도착지 포트존 비교 → 운송유형 정합성',
     logic: `<b>[ODCY도착지명이 공란인 경우 — 기존 방식]</b>
@@ -244,12 +237,26 @@ const STAGE_META = {
 
 <b>운송유형 열 값과 비교하여 불일치 시 오류</b>`
   },
-  '7': {
+  '6': {
     name:'일자 순서 체크',
     desc:'출하일→반입일→반출일→터미널반입일→선적일 순서 확인',
     logic: `<b>날짜 순서:</b> 출하일 ≤ ODCY 반입일 ≤ ODCY 반출일 ≤ 터미널 반입일 ≤ 선적일
 이전 단계 날짜보다 이후 단계 날짜가 더 이전이면 오류
 ※ 공란인 날짜는 건너뛰고 다음 날짜와 비교 (예: 출하일 4/24, 반입일 공란, 터미널반입일 4/25 → 정상)`
+  },
+  '7': {
+    name:'직상차 체크',
+    desc:'직상차 컨테이너 Waiting (ODCY) 확인',
+    logic: `<b>① 입력한 컨테이너:</b> 검증파일의 "Container No." 열에서 검색 → Waiting (ODCY) 열이 "X"가 아니면 오류
+<b>② 입력하지 않은 컨테이너:</b> Waiting (ODCY) 열이 "X"로 체크되어 있으면 오류 (직상차 목록에 없는데 체크됨)
+※ 이 단계는 선택사항으로 건너뛸 수 있음`
+  },
+  '8': {
+    name:'C/Invoice No. 도착지명 정합성 체크',
+    desc:'동일 C/Invoice No.의 도착지명 일치 여부 확인',
+    logic: `<b>같은 C/Invoice No.를 가진 행들의 도착지명 비교:</b>
+  동일한 C/Invoice No.인데 도착지명이 서로 다른 행이 존재하면, 해당 C/Invoice No.의 모든 행을 오류로 표시
+※ C/Invoice No.가 공란인 행은 검사에서 제외`
   },
 };
 
@@ -338,7 +345,7 @@ async function loadSession(sid) {
       errors: session.errors,
       error_counts: {},
     };
-    for (const k of ['1','2','3','4','5','6','7']) {
+    for (const k of ['1','2','3','4','5','6','7','8']) {
       data.error_counts[k] = (session.errors[k] || []).length;
     }
     displayResults(data);
@@ -356,27 +363,27 @@ function displayResults(data) {
 
   let totalErr = 0;
   for (const k in (data.error_counts || {})) totalErr += data.error_counts[k];
-  if (data.errors && data.errors['4']) totalErr += data.errors['4'].length;
+  if (data.errors && data.errors['7']) totalErr += data.errors['7'].length;
   document.getElementById('s-total-errors').textContent = totalErr;
   const errBlock = document.getElementById('s-total-errors-block');
   errBlock.className = totalErr > 0 ? 'summary-block summary-diff' : 'summary-block summary-ok';
 
-  // Stage cards (1,2,3,5,6,7)
+  // Stage cards (1,2,3,4,5,6,8)
   const container = document.getElementById('stage-cards');
   container.innerHTML = '';
-  for (const stageNum of ['1','2','3','5','6','7']) {
+  for (const stageNum of ['1','2','3','4','5','6','8']) {
     const errors = currentErrors[stageNum] || [];
     const meta = STAGE_META[stageNum];
     container.appendChild(createStageCard(stageNum, meta, errors));
   }
 
-  // Stage 4 badge
-  if (currentErrors['4']) {
-    const s4Errors = currentErrors['4'];
-    const badge = document.getElementById('s4-badge');
-    badge.textContent = s4Errors.length > 0 ? `오류 ${s4Errors.length}건` : '정상';
-    badge.className = s4Errors.length > 0 ? 'badge badge-error' : 'badge badge-ok';
-    document.getElementById('stage4-result').innerHTML = renderErrorTable(s4Errors);
+  // Stage 7 badge
+  if (currentErrors['7']) {
+    const s7Errors = currentErrors['7'];
+    const badge = document.getElementById('s7-badge');
+    badge.textContent = s7Errors.length > 0 ? `오류 ${s7Errors.length}건` : '정상';
+    badge.className = s7Errors.length > 0 ? 'badge badge-error' : 'badge badge-ok';
+    document.getElementById('stage7-result').innerHTML = renderErrorTable(s7Errors);
   }
 }
 
@@ -434,24 +441,24 @@ function toggleStage(bodyId) {
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
-// ─── Stage 4 ────────────────────────────────────────────
-async function runStage4() {
+// ─── Stage 7 ────────────────────────────────────────────
+async function runStage7() {
   if (!currentSessionId) return alert('먼저 파일을 업로드하세요.');
-  const text = document.getElementById('stage4-input').value.trim();
+  const text = document.getElementById('stage7-input').value.trim();
   if (!text) return alert('컨테이너 번호를 입력하세요.');
   const numbers = text.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
 
   try {
-    const res = await fetch(API + `/stage4/${currentSessionId}`, {
+    const res = await fetch(API + `/stage7/${currentSessionId}`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({container_numbers: numbers}),
     });
-    if (!res.ok) throw new Error('Stage 4 검증 실패');
+    if (!res.ok) throw new Error('Stage 7 검증 실패');
     const data = await res.json();
-    currentErrors['4'] = data.errors;
+    currentErrors['7'] = data.errors;
 
-    const badge = document.getElementById('s4-badge');
+    const badge = document.getElementById('s7-badge');
     if (data.errors.length > 0) {
       badge.textContent = `오류 ${data.errors.length}건`;
       badge.className = 'badge badge-error';
@@ -459,7 +466,7 @@ async function runStage4() {
       badge.textContent = `정상 (${data.total_containers}건 확인)`;
       badge.className = 'badge badge-ok';
     }
-    document.getElementById('stage4-result').innerHTML = renderErrorTable(data.errors);
+    document.getElementById('stage7-result').innerHTML = renderErrorTable(data.errors);
 
     // Update total errors
     let total = 0;
@@ -468,11 +475,11 @@ async function runStage4() {
   } catch(e) { alert(e.message); }
 }
 
-function skipStage4() {
-  const badge = document.getElementById('s4-badge');
+function skipStage7() {
+  const badge = document.getElementById('s7-badge');
   badge.textContent = '건너뜀';
   badge.className = 'badge badge-skip';
-  document.getElementById('stage4-result').innerHTML = '<p style="color:#6b7280;font-size:13px">이 단계를 건너뛰었습니다.</p>';
+  document.getElementById('stage7-result').innerHTML = '<p style="color:#6b7280;font-size:13px">이 단계를 건너뛰었습니다.</p>';
 }
 
 // ─── 리포트 다운로드 ────────────────────────────────────

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from app.services.checklist_service import (
     parse_checklist_excel,
     run_checklist,
-    run_stage4,
+    run_stage7,
     get_session,
     list_sessions,
     generate_checklist_report,
@@ -37,7 +37,7 @@ async def upload_checklist(file: UploadFile = File(...)):
     session = run_checklist(file.filename, rows)
 
     error_counts = {}
-    for stage_num in ("1", "2", "3", "5", "6", "7"):
+    for stage_num in ("1", "2", "3", "4", "5", "6", "8"):
         error_counts[stage_num] = len(session["errors"].get(stage_num, []))
 
     return {
@@ -50,13 +50,13 @@ async def upload_checklist(file: UploadFile = File(...)):
     }
 
 
-class Stage4Request(BaseModel):
+class Stage7Request(BaseModel):
     container_numbers: list[str]
 
 
-@router.post("/stage4/{session_id}")
-async def check_stage4(session_id: int, body: Stage4Request):
-    errors = run_stage4(session_id, body.container_numbers)
+@router.post("/stage7/{session_id}")
+async def check_stage7(session_id: int, body: Stage7Request):
+    errors = run_stage7(session_id, body.container_numbers)
     return {
         "errors": errors,
         "count": len(errors),

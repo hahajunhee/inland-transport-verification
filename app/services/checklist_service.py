@@ -1,6 +1,6 @@
 """
 1단계 체크리스트 검증 서비스
-7개 Stage에 걸쳐 검증파일의 데이터 정합성을 확인합니다.
+8개 Stage에 걸쳐 검증파일의 데이터 정합성을 확인합니다.
 """
 import json
 import pandas as pd
@@ -276,9 +276,9 @@ def check_stage3(rows: list[dict]) -> list[dict]:
     return errors
 
 
-# ─── Stage 4: 직상차 체크 ─────────────────────────────────────────────
+# ─── Stage 7: 직상차 체크 ─────────────────────────────────────────────
 
-def check_stage4(rows: list[dict], container_numbers: list[str]) -> list[dict]:
+def check_stage7(rows: list[dict], container_numbers: list[str]) -> list[dict]:
     cn_set = {cn.strip().upper() for cn in container_numbers if cn.strip()}
 
     cn_map: dict[str, list[dict]] = {}
@@ -330,9 +330,9 @@ def check_stage4(rows: list[dict], container_numbers: list[str]) -> list[dict]:
     return errors
 
 
-# ─── Stage 5: 운송유형/모드 누락 체크 ─────────────────────────────────
+# ─── Stage 4: 운송유형/모드 누락 체크 ─────────────────────────────────
 
-def check_stage5(rows: list[dict]) -> list[dict]:
+def check_stage4(rows: list[dict]) -> list[dict]:
     errors = []
     checks = [("transport_type", "운송유형"), ("transport_mode", "운송모드")]
     for row in rows:
@@ -348,7 +348,7 @@ def check_stage5(rows: list[dict]) -> list[dict]:
     return errors
 
 
-# ─── Stage 6: 왕복/편도 체크 ──────────────────────────────────────────
+# ─── Stage 5: 왕복/편도 체크 ──────────────────────────────────────────
 
 def _resolve_port_type(name: str) -> tuple[Optional[str], bool]:
     """포트명매핑: excel_name(PM-A) → port_type(PM-B). 반환: (PM-B, found)"""
@@ -387,7 +387,7 @@ def _om_d_to_port(om_d: str) -> str:
     return "부산북항"
 
 
-def check_stage6(rows: list[dict]) -> list[dict]:
+def check_stage5(rows: list[dict]) -> list[dict]:
     errors = []
     for row in rows:
         pickup_name = row.get("pickup_name")
@@ -440,7 +440,7 @@ def check_stage6(rows: list[dict]) -> list[dict]:
     return errors
 
 
-# ─── Stage 7: 일자 순서 체크 ──────────────────────────────────────────
+# ─── Stage 6: 일자 순서 체크 ──────────────────────────────────────────
 
 _DATE_FIELDS = [
     ("transport_date", "출하일"),
@@ -451,7 +451,7 @@ _DATE_FIELDS = [
 ]
 
 
-def check_stage7(rows: list[dict]) -> list[dict]:
+def check_stage6(rows: list[dict]) -> list[dict]:
     errors = []
     for row in rows:
         dates = []
@@ -476,6 +476,38 @@ def check_stage7(rows: list[dict]) -> list[dict]:
     return errors
 
 
+# ─── Stage 8: C/Invoice No. 도착지명 정합성 체크 ─────────────────────
+
+def check_stage8(rows: list[dict]) -> list[dict]:
+    """같은 C/Invoice No.인데 도착지명이 다른 행 전부를 오류로 반환"""
+    invoice_groups: dict[str, list[dict]] = {}
+    for row in rows:
+        inv = (row.get("c_invoice_no") or "").strip()
+        if inv:
+            invoice_groups.setdefault(inv, []).append(row)
+
+    errors = []
+    for inv, group_rows in invoice_groups.items():
+        dest_names = set()
+        for r in group_rows:
+            dn = (r.get("dest_name") or "").strip()
+            if dn:
+                dest_names.add(dn)
+
+        if len(dest_names) > 1:
+            dest_list = ", ".join(sorted(dest_names))
+            for r in group_rows:
+                errors.append({
+                    "row_number": r["row_number"],
+                    "container_no": r.get("container_no"),
+                    "column": "도착지명",
+                    "value": (r.get("dest_name") or "").strip() or "(공란)",
+                    "reason": f"C/Invoice No. '{inv}'에 도착지명이 복수({dest_list})입니다",
+                })
+
+    return errors
+
+
 # ─── 전체 검증 실행 ───────────────────────────────────────────────────
 
 def run_checklist(filename: str, rows: list[dict]) -> dict:
@@ -484,9 +516,10 @@ def run_checklist(filename: str, rows: list[dict]) -> dict:
         "1": check_stage1(rows),
         "2": check_stage2(rows),
         "3": check_stage3(rows),
+        "4": check_stage4(rows),
         "5": check_stage5(rows),
         "6": check_stage6(rows),
-        "7": check_stage7(rows),
+        "8": check_stage8(rows),
     }
 
     session_id = _next_session_id()
@@ -502,13 +535,13 @@ def run_checklist(filename: str, rows: list[dict]) -> dict:
     return session
 
 
-def run_stage4(session_id: int, container_numbers: list[str]) -> list[dict]:
+def run_stage7(session_id: int, container_numbers: list[str]) -> list[dict]:
     data = _load_session(session_id)
     if not data:
         return []
     rows = data.get("rows", [])
-    errors = check_stage4(rows, container_numbers)
-    data["session"]["errors"]["4"] = errors
+    errors = check_stage7(rows, container_numbers)
+    data["session"]["errors"]["7"] = errors
     _save_session(session_id, data["session"], rows)
     return errors
 
@@ -568,10 +601,11 @@ STAGE_NAMES = {
     "1": "필수 항목 공란 체크",
     "2": "리퍼 / DG 체크",
     "3": "공휴일 / 주말 체크",
-    "4": "직상차 체크",
-    "5": "운송유형 / 모드 누락 체크",
-    "6": "왕복 / 편도 체크",
-    "7": "일자 순서 체크",
+    "4": "운송유형 / 모드 누락 체크",
+    "5": "왕복 / 편도 체크",
+    "6": "일자 순서 체크",
+    "7": "직상차 체크",
+    "8": "C/Invoice No. 도착지명 정합성 체크",
 }
 
 _FILL_HEADER = PatternFill("solid", fgColor="1A73E8")
@@ -598,7 +632,7 @@ def generate_checklist_report(session: dict) -> bytes:
         cell.alignment = Alignment(horizontal="center")
 
     total_errors = 0
-    for stage_num in ("1", "2", "3", "4", "5", "6", "7"):
+    for stage_num in ("1", "2", "3", "4", "5", "6", "7", "8"):
         stage_errors = errors.get(stage_num, [])
         count = len(stage_errors)
         total_errors += count
@@ -620,7 +654,7 @@ def generate_checklist_report(session: dict) -> bytes:
         cell.font = _FONT_HEADER
         cell.alignment = Alignment(horizontal="center")
 
-    for stage_num in ("1", "2", "3", "4", "5", "6", "7"):
+    for stage_num in ("1", "2", "3", "4", "5", "6", "7", "8"):
         stage_errors = errors.get(stage_num, [])
         for err in stage_errors:
             ws2.append([
