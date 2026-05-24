@@ -83,14 +83,23 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
                     exact_matches.setdefault(header, []).append(ci)
                     break
 
-    # 할당: 비용 항목은 마지막(우측) 매칭, 나머지는 첫(좌측) 매칭
+    # 할당
     col_map = {}
+    # 비용 항목: 유일 매칭 컬럼들의 평균 위치(앵커)에 가까운 쪽 선택
+    single_positions = []
+    for h in _COST_HEADERS:
+        if h in exact_matches and len(exact_matches[h]) == 1:
+            single_positions.append(exact_matches[h][0])
+    anchor = (sum(single_positions) / len(single_positions)) if single_positions else None
+
     for header in ALL_HEADERS:
-        if header in exact_matches:
-            if header in _COST_HEADERS:
-                col_map[header] = exact_matches[header][-1]   # 우측 우선
-            else:
-                col_map[header] = exact_matches[header][0]    # 좌측 우선
+        if header not in exact_matches:
+            continue
+        matches = exact_matches[header]
+        if header in _COST_HEADERS and len(matches) > 1 and anchor is not None:
+            col_map[header] = min(matches, key=lambda ci: abs(ci - anchor))
+        else:
+            col_map[header] = matches[0]    # 기본: 좌측 우선
 
     # Pass 2: combined 텍스트에서 부분 매칭 (미발견 헤더만)
     for ci, candidates in enumerate(col_candidates):
@@ -108,7 +117,9 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
     elif len(dest_cols) == 1:
         col_map["도착지"] = dest_cols[0]
 
-    return col_map
+    # 비용 항목 정확 매칭 후보 정보도 함께 반환
+    cost_exact = {h: exact_matches.get(h, []) for h in _COST_HEADERS}
+    return col_map, cost_exact
 
 
 def _find_data_start(df: pd.DataFrame, col_map: dict) -> int:
@@ -134,7 +145,7 @@ def _find_data_start(df: pd.DataFrame, col_map: dict) -> int:
 def parse_mobis_excel(file_bytes: bytes) -> dict:
     """모비스 검증 엑셀 파싱."""
     df = pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
-    col_map = _find_header_columns(df)
+    col_map, cost_exact = _find_header_columns(df)
 
     # 필수 컬럼 확인
     missing = [h for h in _REQUIRED_HEADERS if h not in col_map]
@@ -188,15 +199,26 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
             "row_number": ri + 1,
         })
 
-    # 비용 컬럼 디버그 정보 (엑셀 열 문자 표시)
+    # 비용 컬럼 디버그 정보
     from openpyxl.utils import get_column_letter
     debug_cost_cols = {}
     for h in _COST_HEADERS:
+        info_parts = []
         if h in col_map:
             ci = col_map[h]
-            debug_cost_cols[h] = f"{get_column_letter(ci + 1)}(col {ci})"
+            # 선택된 컬럼
+            info_parts.append(f"선택={get_column_letter(ci + 1)}(col{ci})")
+            # 첫 데이터행 원시값
+            if data_start < len(df):
+                raw = df.iloc[data_start, ci]
+                info_parts.append(f"raw={repr(raw)}")
         else:
-            debug_cost_cols[h] = "미발견"
+            info_parts.append("미발견")
+        # 모든 후보 컬럼
+        all_cols = [get_column_letter(c + 1) for c in cost_exact.get(h, [])]
+        if all_cols:
+            info_parts.append(f"후보={all_cols}")
+        debug_cost_cols[h] = " / ".join(info_parts)
 
     return {
         "rows": rows,
@@ -494,14 +516,17 @@ def generate_mobis_report(verification: dict) -> bytes:
         # MOBIS 세부
         for h in cost_headers:
             row_data.append(md.get(h, 0.0) if is_err else "")
-        # 정산 예상금액
+        # 정산 예상금액 (오류행만)
         exp = r.get("expected") or {}
         for f in _EXPECTED_FIELDS:
-            val = exp.get(f)
-            if val is None or val == "" or val == "존재X":
-                row_data.append(val if val == "존재X" else "")
+            if not is_err:
+                row_data.append("")
             else:
-                row_data.append(_safe_float(val))
+                val = exp.get(f)
+                if val is None or val == "" or val == "존재X":
+                    row_data.append(val if val == "존재X" else "")
+                else:
+                    row_data.append(_safe_float(val))
         # 정산검증 참조
         row_data += [rf.get(f, "") for f in _REF_FIELDS]
         # 구간

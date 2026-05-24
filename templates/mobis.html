@@ -384,10 +384,14 @@ function renderTable() {
       }
     });
 
-    // 정산 예상금액 4열
+    // 정산 예상금액 4열 (오류행만 표시)
     const exp = r.expected || {};
     const ed = r.expected_diffs || {};
     EXPECTED_KEYS.forEach(k => {
+      if (!isErr) {
+        html += `<td class="detail-empty">-</td>`;
+        return;
+      }
       const v = exp[k];
       if (v === '존재X') {
         html += `<td class="ref-missing">${v}</td>`;
