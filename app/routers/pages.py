@@ -46,6 +46,11 @@ def checklist_page(request: Request):
     return templates.TemplateResponse("checklist.html", {"request": request})
 
 
+@router.get("/mobis")
+def mobis_page(request: Request):
+    return templates.TemplateResponse("mobis.html", {"request": request})
+
+
 @router.get("/rate-register")
 def rate_register_page(request: Request):
     return templates.TemplateResponse("rate_register.html", {"request": request})

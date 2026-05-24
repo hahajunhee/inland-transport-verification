@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}3단계 모비스검증 - 내륙운송정산검증{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">3단계 모비스검증</h1>
+</div>
+
+<!-- 업로드 -->
+<div class="card">
+  <h2 class="card-title">엑셀 파일 업로드</h2>
+  <div id="drop-zone" class="drop-zone">
+    <div class="drop-icon">📂</div>
+    <div class="drop-text">모비스 정산 엑셀 파일을 여기에 드래그하거나 클릭하여 선택</div>
+    <div class="drop-sub">지원 형식: .xlsx, .xls</div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none" />
+  </div>
+  <div id="file-selected" class="file-selected" style="display:none">
+    <span id="file-name"></span>
+    <button class="btn btn-primary" id="upload-btn" onclick="uploadFile()">검증 시작</button>
+    <button class="btn btn-outline" onclick="resetUpload()">취소</button>
+  </div>
+  <div id="upload-progress" style="display:none">
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="progress-text" id="progress-text">처리 중...</div>
+  </div>
+  <div id="upload-error" class="alert alert-error" style="display:none"></div>
+</div>
+
+<!-- 요약 -->
+<div id="summary-section" style="display:none">
+  <div class="card">
+    <h2 class="card-title">검증 요약 <span id="summary-filename" class="filename-badge"></span></h2>
+    <div class="summary-grid">
+      <div class="summary-block">
+        <div class="summary-label">총 건수</div>
+        <div class="summary-value" id="s-total">-</div>
+      </div>
+      <div class="summary-block summary-ok">
+        <div class="summary-label">정상</div>
+        <div class="summary-value" style="color:#1e7e34" id="s-ok">-</div>
+      </div>
+      <div class="summary-block summary-diff">
+        <div class="summary-label">오류</div>
+        <div class="summary-value" id="s-error">-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 결과 테이블 -->
+  <div class="card">
+    <div class="card-header-row">
+      <h2 class="card-title">검증 결과</h2>
+      <div class="filter-row">
+        <button class="btn btn-sm btn-outline filter-btn active" data-filter="ALL" onclick="setFilter('ALL', this)">전체</button>
+        <button class="btn btn-sm btn-diff filter-btn" data-filter="ERROR" onclick="setFilter('ERROR', this)">오류만</button>
+        <button class="btn btn-sm btn-primary" onclick="downloadReport()">엑셀 다운로드</button>
+      </div>
+    </div>
+
+    <div class="table-wrapper mobis-table-wrapper">
+      <table class="data-table" id="results-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>컨테이너 번호</th>
+            <th>C/INV 번호</th>
+            <th>GROVE ODCY 전송<br>합계</th>
+            <th>GROVE 전송<br>합계</th>
+            <th>MOBIS 산출<br>합계</th>
+            <th>차이<br>(GROVE-MOBIS)</th>
+            <th>결과</th>
+            <th>오류 사유</th>
+          </tr>
+        </thead>
+        <tbody id="results-tbody">
+          <tr><td colspan="9" class="empty-msg">파일을 업로드하세요.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="result-count" class="result-count"></div>
+  </div>
+</div>
+
+<style>
+.mobis-table-wrapper {
+  max-height: calc(100vh - 340px);
+  overflow: auto;
+}
+.mobis-table-wrapper thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f0f4ff;
+}
+.filename-badge {
+  font-size: 12px;
+  background: #e8f0fe;
+  color: #1a73e8;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+.row-error td {
+  background: #fff0f0 !important;
+}
+.status-error {
+  color: #c62828;
+  font-weight: 700;
+}
+.status-ok {
+  color: #1e7e34;
+  font-weight: 700;
+}
+.error-cell {
+  background: #ffc7ce !important;
+  color: #9c0006;
+  font-weight: 700;
+}
+.reason-cell {
+  text-align: left !important;
+  font-size: 12px;
+  white-space: normal;
+  max-width: 400px;
+}
+.alert-error {
+  background: #fce8e6;
+  color: #c62828;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const API_BASE = '/api/mobis';
+let currentFile = null;
+let allResults = [];
+let currentFilter = 'ALL';
+
+// ── 드래그 & 드롭 ──────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) selectFile(f);
+});
+fileInput.addEventListener('change', e => { if (e.target.files[0]) selectFile(e.target.files[0]); });
+
+function selectFile(f) {
+  currentFile = f;
+  document.getElementById('file-name').textContent = f.name;
+  document.getElementById('file-selected').style.display = 'flex';
+  dropZone.style.display = 'none';
+  document.getElementById('upload-error').style.display = 'none';
+}
+
+function resetUpload() {
+  currentFile = null;
+  fileInput.value = '';
+  document.getElementById('file-selected').style.display = 'none';
+  dropZone.style.display = '';
+}
+
+// ── 업로드 & 검증 ──────────────────────────────────────────
+async function uploadFile() {
+  if (!currentFile) return;
+  const btn = document.getElementById('upload-btn');
+  const progress = document.getElementById('upload-progress');
+  const errorDiv = document.getElementById('upload-error');
+
+  btn.disabled = true;
+  progress.style.display = 'block';
+  errorDiv.style.display = 'none';
+
+  try {
+    const fd = new FormData();
+    fd.append('file', currentFile);
+    const resp = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || '검증 실패');
+    }
+    const data = await resp.json();
+    showResults(data);
+  } catch (e) {
+    errorDiv.textContent = e.message;
+    errorDiv.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    progress.style.display = 'none';
+  }
+}
+
+// ── 결과 표시 ──────────────────────────────────────────────
+function showResults(data) {
+  allResults = data.results || [];
+  document.getElementById('summary-section').style.display = '';
+  document.getElementById('summary-filename').textContent = data.filename || '';
+  document.getElementById('s-total').textContent = data.total_groups;
+  document.getElementById('s-ok').textContent = data.ok_count;
+  document.getElementById('s-error').textContent = data.error_count;
+  renderTable();
+}
+
+function renderTable() {
+  const tbody = document.getElementById('results-tbody');
+  let filtered = allResults;
+  if (currentFilter === 'ERROR') {
+    filtered = allResults.filter(r => r.is_error);
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">${currentFilter === 'ERROR' ? '오류 건이 없습니다.' : '결과가 없습니다.'}</td></tr>`;
+    document.getElementById('result-count').textContent = '';
+    return;
+  }
+
+  const rows = filtered.map((r, i) => {
+    const rowClass = r.is_error ? 'row-error' : '';
+    const statusClass = r.is_error ? 'error-cell' : 'status-ok';
+    const fmt = v => (v === null || v === undefined) ? '-' : Number(v).toLocaleString('ko-KR');
+    const diffClass = r.is_error && Math.abs(r.diff || 0) >= 1 ? 'error-cell' : '';
+    const odcyClass = r.is_error && Math.abs(r.grove_odcy_sum || 0) >= 1 ? 'error-cell' : '';
+
+    return `<tr class="${rowClass}">
+      <td>${i + 1}</td>
+      <td>${r.container_no || ''}</td>
+      <td>${r.c_inv_no || ''}</td>
+      <td class="${odcyClass}">${fmt(r.grove_odcy_sum)}</td>
+      <td>${fmt(r.grove_sum)}</td>
+      <td>${fmt(r.mobis_sum)}</td>
+      <td class="${diffClass}">${fmt(r.diff)}</td>
+      <td class="${statusClass}">${r.status}</td>
+      <td class="reason-cell">${(r.error_reasons || []).join('<br>')}</td>
+    </tr>`;
+  });
+
+  tbody.innerHTML = rows.join('');
+  document.getElementById('result-count').textContent =
+    `${currentFilter === 'ALL' ? '전체' : '오류'} ${filtered.length}건 표시`;
+}
+
+// ── 필터 ──────────────────────────────────────────────────
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTable();
+}
+
+// ── 다운로드 ──────────────────────────────────────────────
+async function downloadReport() {
+  if (!currentFile) return alert('파일을 먼저 업로드하세요.');
+  try {
+    const fd = new FormData();
+    fd.append('file', currentFile);
+    const resp = await fetch(`${API_BASE}/download`, { method: 'POST', body: fd });
+    if (!resp.ok) throw new Error('다운로드 실패');
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const disp = resp.headers.get('Content-Disposition') || '';
+    let fname = '모비스검증결과.xlsx';
+    const m = disp.match(/filename\*=UTF-8''(.+)/);
+    if (m) fname = decodeURIComponent(m[1]);
+    a.href = url;
+    a.download = fname;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+</script>
+{% endblock %}

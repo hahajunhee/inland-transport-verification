@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 
 from app import data_store
-from app.routers import rates, verification, pages, trkv, backup, storage_rates, checklist
+from app.routers import rates, verification, pages, trkv, backup, storage_rates, checklist, mobis
 
 
 @asynccontextmanager
@@ -28,6 +28,7 @@ app.include_router(trkv.router, prefix="/api/trkv", tags=["trkv"])
 app.include_router(backup.router, prefix="/api", tags=["backup"])
 app.include_router(storage_rates.router, prefix="/api/storage-rates", tags=["storage-rates"])
 app.include_router(checklist.router, prefix="/api/checklist", tags=["checklist"])
+app.include_router(mobis.router, prefix="/api/mobis", tags=["mobis"])
 
 
 if __name__ == "__main__":
