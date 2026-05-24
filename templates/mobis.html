@@ -59,22 +59,44 @@
     </div>
 
     <div class="table-wrapper mobis-table-wrapper">
-      <table class="data-table" id="results-table">
+      <table class="data-table mobis-table" id="results-table">
         <thead>
+          <!-- Row 1: 그룹 헤더 -->
           <tr>
-            <th>#</th>
-            <th>컨테이너 번호</th>
-            <th>C/INV 번호</th>
-            <th>GROVE ODCY 전송<br>합계</th>
-            <th>GROVE 전송<br>합계</th>
-            <th>MOBIS 산출<br>합계</th>
-            <th>차이<br>(GROVE-MOBIS)</th>
-            <th>결과</th>
-            <th>오류 사유</th>
+            <th rowspan="2">#</th>
+            <th rowspan="2">컨테이너<br>번호</th>
+            <th rowspan="2">C/INV<br>번호</th>
+            <th rowspan="2">결과</th>
+            <th rowspan="2">오류사유</th>
+            <th rowspan="2">오류사유<br>_모비스</th>
+            <th rowspan="2">GROVE ODCY<br>전송 합계</th>
+            <th rowspan="2">GROVE 전송<br>합계</th>
+            <th rowspan="2">MOBIS 산출<br>합계</th>
+            <th colspan="5" class="th-grove">GROVE 전송 세부</th>
+            <th colspan="5" class="th-mobis">MOBIS 산출 세부</th>
+            <th colspan="5" class="th-route">구간 (MOBIS 산출)</th>
+          </tr>
+          <!-- Row 2: 세부 항목 -->
+          <tr>
+            <th class="th-grove">내륙운임</th>
+            <th class="th-grove">보관료</th>
+            <th class="th-grove">상하차료</th>
+            <th class="th-grove">셔틀료</th>
+            <th class="th-grove">대기료</th>
+            <th class="th-mobis">내륙운임</th>
+            <th class="th-mobis">보관료</th>
+            <th class="th-mobis">상하차료</th>
+            <th class="th-mobis">셔틀료</th>
+            <th class="th-mobis">대기료</th>
+            <th class="th-route">출발지</th>
+            <th class="th-route">작업지</th>
+            <th class="th-route">경유지</th>
+            <th class="th-route">도착지</th>
+            <th class="th-route">ODCY<br>도착지</th>
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="9" class="empty-msg">파일을 업로드하세요.</td></tr>
+          <tr><td colspan="24" class="empty-msg">파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>
@@ -86,13 +108,16 @@
 .mobis-table-wrapper {
   max-height: calc(100vh - 340px);
   overflow: auto;
+  position: relative;
 }
-.mobis-table-wrapper thead th {
+.mobis-table thead th {
   position: sticky;
-  top: 0;
-  z-index: 3;
-  background: #f0f4ff;
+  z-index: 4;
+  border-bottom: 1px solid #d1d5db;
 }
+.mobis-table thead tr:nth-child(1) th { top: 0; z-index: 5; }
+.mobis-table thead tr:nth-child(2) th { top: 38px; z-index: 4; }
+
 .filename-badge {
   font-size: 12px;
   background: #e8f0fe;
@@ -102,28 +127,34 @@
   font-weight: 600;
   margin-left: 8px;
 }
-.row-error td {
-  background: #fff0f0 !important;
-}
-.status-error {
-  color: #c62828;
-  font-weight: 700;
-}
-.status-ok {
-  color: #1e7e34;
-  font-weight: 700;
-}
-.error-cell {
-  background: #ffc7ce !important;
-  color: #9c0006;
-  font-weight: 700;
-}
+
+/* 그룹 헤더 색상 */
+.th-grove { background: #e8f0fe !important; color: #1a73e8; }
+.th-mobis { background: #ccfbf1 !important; color: #0f766e; }
+.th-route { background: #f3e8ff !important; color: #6b21a8; }
+
+/* 행 상태 */
+.row-error td { background: #fff0f0 !important; }
+.status-error { color: #c62828; font-weight: 700; }
+.status-ok { color: #1e7e34; font-weight: 700; }
+.error-cell { background: #ffc7ce !important; color: #9c0006; font-weight: 700; }
+
+/* 노란 음영: 차이나는 항목 */
+.cell-diff-yellow { background: #ffff00 !important; font-weight: 700; }
+
 .reason-cell {
   text-align: left !important;
   font-size: 12px;
   white-space: normal;
-  max-width: 400px;
+  max-width: 200px;
 }
+.jukyo-cell {
+  text-align: left !important;
+  font-size: 12px;
+  white-space: normal;
+  max-width: 200px;
+}
+.detail-empty { color: #ccc; }
 .alert-error {
   background: #fce8e6;
   color: #c62828;
@@ -138,6 +169,8 @@
 {% block scripts %}
 <script>
 const API_BASE = '/api/mobis';
+const COST_KEYS = ['내륙운임', '보관료', '상하차료', '셔틀료', '대기료'];
+const ROUTE_KEYS = ['출발지', '작업지', '경유지', '도착지', 'ODCY도착지'];
 let currentFile = null;
 let allResults = [];
 let currentFilter = 'ALL';
@@ -221,29 +254,65 @@ function renderTable() {
   }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">${currentFilter === 'ERROR' ? '오류 건이 없습니다.' : '결과가 없습니다.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="24" class="empty-msg">${currentFilter === 'ERROR' ? '오류 건이 없습니다.' : '결과가 없습니다.'}</td></tr>`;
     document.getElementById('result-count').textContent = '';
     return;
   }
 
-  const rows = filtered.map((r, i) => {
-    const rowClass = r.is_error ? 'row-error' : '';
-    const statusClass = r.is_error ? 'error-cell' : 'status-ok';
-    const fmt = v => (v === null || v === undefined) ? '-' : Number(v).toLocaleString('ko-KR');
-    const diffClass = r.is_error && Math.abs(r.diff || 0) >= 1 ? 'error-cell' : '';
-    const odcyClass = r.is_error && Math.abs(r.grove_odcy_sum || 0) >= 1 ? 'error-cell' : '';
+  const fmt = v => (v === null || v === undefined || v === '') ? '' : Number(v).toLocaleString('ko-KR');
 
-    return `<tr class="${rowClass}">
-      <td>${i + 1}</td>
-      <td>${r.container_no || ''}</td>
-      <td>${r.c_inv_no || ''}</td>
-      <td class="${odcyClass}">${fmt(r.grove_odcy_sum)}</td>
-      <td>${fmt(r.grove_sum)}</td>
-      <td>${fmt(r.mobis_sum)}</td>
-      <td class="${diffClass}">${fmt(r.diff)}</td>
-      <td class="${statusClass}">${r.status}</td>
-      <td class="reason-cell">${(r.error_reasons || []).join('<br>')}</td>
-    </tr>`;
+  const rows = filtered.map((r, i) => {
+    const isErr = r.is_error;
+    const rowClass = isErr ? 'row-error' : '';
+    const statusClass = isErr ? 'error-cell' : 'status-ok';
+
+    // 기본 열
+    let html = `<tr class="${rowClass}">`;
+    html += `<td>${i + 1}</td>`;
+    html += `<td>${r.container_no || ''}</td>`;
+    html += `<td>${r.c_inv_no || ''}</td>`;
+    html += `<td class="${statusClass}">${r.status}</td>`;
+    html += `<td class="reason-cell">${(r.error_reasons || []).join('<br>')}</td>`;
+    html += `<td class="jukyo-cell">${r.jukyo || ''}</td>`;
+    html += `<td class="${isErr ? 'error-cell' : ''}">${fmt(r.grove_odcy_sum)}</td>`;
+    html += `<td>${fmt(r.grove_sum)}</td>`;
+    html += `<td>${fmt(r.mobis_sum)}</td>`;
+
+    // GROVE 전송 세부 + MOBIS 산출 세부 (오류행만 값 표시)
+    const gd = r.grove_detail || {};
+    const md = r.mobis_detail || {};
+    const dd = r.detail_diffs || {};
+
+    // GROVE 전송 세부 5열
+    COST_KEYS.forEach(k => {
+      if (isErr) {
+        const isDiff = dd[k];
+        const cls = isDiff ? 'cell-diff-yellow' : '';
+        html += `<td class="${cls}">${fmt(gd[k] || 0)}</td>`;
+      } else {
+        html += `<td class="detail-empty">-</td>`;
+      }
+    });
+
+    // MOBIS 산출 세부 5열
+    COST_KEYS.forEach(k => {
+      if (isErr) {
+        const isDiff = dd[k];
+        const cls = isDiff ? 'cell-diff-yellow' : '';
+        html += `<td class="${cls}">${fmt(md[k] || 0)}</td>`;
+      } else {
+        html += `<td class="detail-empty">-</td>`;
+      }
+    });
+
+    // 구간 5열 (MOBIS 산출 — 모든 행 표시)
+    const rt = r.route || {};
+    ROUTE_KEYS.forEach(k => {
+      html += `<td>${rt[k] || ''}</td>`;
+    });
+
+    html += `</tr>`;
+    return html;
   });
 
   tbody.innerHTML = rows.join('');

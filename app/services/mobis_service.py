@@ -10,11 +10,11 @@ from openpyxl.utils import get_column_letter
 
 
 # ─── 열제목 매핑 ────────────────────────────────────────────────────────
-# 엑셀 1:2행 병합 헤더에서 찾아야 할 컬럼명
 _REQUIRED_HEADERS = ["컨테이너 번호", "C/INV\n번호", "구분"]
 _COST_HEADERS = ["내륙운임", "보관료", "상하차료", "셔틀료", "대기료"]
+_EXTRA_HEADERS = ["적요", "출발지", "작업지", "경유지"]
 
-# 구분 카테고리 (원본 텍스트 그대로)
+# 구분 카테고리
 CAT_GROVE_ODCY = "GROVE ODCY 전송"
 CAT_GROVE = "GROVE 전송"
 CAT_MOBIS = "MOBIS 산출"
@@ -33,14 +33,22 @@ def _safe_float(value) -> float:
         return 0.0
 
 
+def _safe_str(value) -> str:
+    if value is None:
+        return ""
+    s = str(value).strip()
+    return "" if s in ("nan", "None", "NaT") else s
+
+
 def _find_header_columns(df: pd.DataFrame) -> dict:
     """
     1:2행 병합 헤더에서 필요 컬럼 위치를 찾는다.
-    반환: {internal_key: column_index}
+    반환: {header_name: column_index}
     """
-    # 0행과 1행을 합쳐서 검색 (병합 셀은 한쪽에만 값이 있음)
+    ALL_HEADERS = _REQUIRED_HEADERS + _COST_HEADERS + _EXTRA_HEADERS
     nrows = min(5, len(df))
     col_map = {}
+    dest_cols = []  # "도착지" 중복 처리용
 
     for ci in range(len(df.columns)):
         candidates = []
@@ -50,92 +58,100 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
                 candidates.append(val)
         combined = "\n".join(candidates)
 
-        # 정확 매칭 (줄바꿈 포함 비교)
-        for header in _REQUIRED_HEADERS + _COST_HEADERS:
-            norm_header = header.replace("\n", "").replace(" ", "")
-            norm_combined = combined.replace("\n", "").replace(" ", "")
-            if norm_header in norm_combined:
-                col_map[header] = ci
-
-        # 개별 행에서도 매칭 시도
+        # "도착지" 개별 수집 (중복 가능 — 구간/ODCY)
         for val in candidates:
-            norm_val = val.replace("\n", "").replace(" ", "")
-            for header in _REQUIRED_HEADERS + _COST_HEADERS:
-                norm_header = header.replace("\n", "").replace(" ", "")
+            if val.replace(" ", "") == "도착지":
+                dest_cols.append(ci)
+                break
+
+        # 일반 헤더 매칭
+        for header in ALL_HEADERS:
+            norm_header = header.replace("\n", "").replace(" ", "")
+            # combined에서 검색
+            norm_combined = combined.replace("\n", "").replace(" ", "")
+            if norm_header in norm_combined and header not in col_map:
+                col_map[header] = ci
+            # 개별 후보에서 정확 매칭
+            for val in candidates:
+                norm_val = val.replace("\n", "").replace(" ", "")
                 if norm_val == norm_header and header not in col_map:
                     col_map[header] = ci
+
+    # "도착지" 중복 처리: 첫번째=구간 도착지, 두번째=ODCY 도착지
+    if len(dest_cols) >= 2:
+        col_map["도착지"] = dest_cols[0]
+        col_map["ODCY도착지"] = dest_cols[1]
+    elif len(dest_cols) == 1:
+        col_map["도착지"] = dest_cols[0]
 
     return col_map
 
 
 def _find_data_start(df: pd.DataFrame, col_map: dict) -> int:
     """헤더 행 이후 실제 데이터 시작 행 인덱스 반환."""
-    container_col = col_map.get("컨테이너 번호")
     gubun_col = col_map.get("구분")
+    container_col = col_map.get("컨테이너 번호")
 
-    if container_col is None or gubun_col is None:
-        return 2  # fallback
+    if gubun_col is None:
+        return 2
 
     for ri in range(len(df)):
         val = str(df.iloc[ri, gubun_col]).strip()
-        # 구분 값이 3개 카테고리 중 하나이면 데이터 시작
         if val in _CATEGORIES:
             return ri
-        # 또는 컨테이너 번호 패턴 (영문+숫자 11자리)
-        cont_val = str(df.iloc[ri, container_col]).strip()
-        if len(cont_val) >= 10 and cont_val[:4].isalpha():
-            return ri
+        if container_col is not None:
+            cont_val = str(df.iloc[ri, container_col]).strip()
+            if len(cont_val) >= 10 and cont_val[:4].isalpha():
+                return ri
 
     return 2
 
 
 def parse_mobis_excel(file_bytes: bytes) -> dict:
-    """
-    모비스 검증 엑셀 파싱.
-    반환: {
-        "rows": [...],
-        "cost_headers": ["내륙운임", "보관료", ...],
-        "col_map": {...}
-    }
-    """
+    """모비스 검증 엑셀 파싱."""
     df = pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
-
     col_map = _find_header_columns(df)
 
     # 필수 컬럼 확인
-    missing = []
-    for h in _REQUIRED_HEADERS:
-        if h not in col_map:
-            missing.append(h)
+    missing = [h for h in _REQUIRED_HEADERS if h not in col_map]
     if missing:
         raise ValueError(f"필수 컬럼을 찾을 수 없습니다: {', '.join(missing)}")
 
-    # 비용 컬럼 확인
     found_costs = [h for h in _COST_HEADERS if h in col_map]
     if not found_costs:
         raise ValueError("비용 컬럼(내륙운임, 보관료, 상하차료, 셔틀료, 대기료)을 찾을 수 없습니다.")
 
     data_start = _find_data_start(df, col_map)
 
+    # 구간 컬럼 키 목록
+    route_keys = ["출발지", "작업지", "경유지", "도착지", "ODCY도착지"]
+
     rows = []
     for ri in range(data_start, len(df)):
-        container_no = str(df.iloc[ri, col_map["컨테이너 번호"]]).strip()
-        c_inv = str(df.iloc[ri, col_map["C/INV\n번호"]]).strip()
-        gubun = str(df.iloc[ri, col_map["구분"]]).strip()
+        container_no = _safe_str(df.iloc[ri, col_map["컨테이너 번호"]])
+        c_inv = _safe_str(df.iloc[ri, col_map["C/INV\n번호"]])
+        gubun = _safe_str(df.iloc[ri, col_map["구분"]])
 
-        if container_no in ("nan", "None", "") and c_inv in ("nan", "None", ""):
+        if not container_no and not c_inv:
             continue
 
-        container_no = "" if container_no in ("nan", "None") else container_no
-        c_inv = "" if c_inv in ("nan", "None") else c_inv
-        gubun = "" if gubun in ("nan", "None") else gubun
-
+        # 비용 항목별 값
         costs = {}
         for h in _COST_HEADERS:
-            if h in col_map:
-                costs[h] = _safe_float(df.iloc[ri, col_map[h]])
+            costs[h] = _safe_float(df.iloc[ri, col_map[h]]) if h in col_map else 0.0
+
+        # 적요
+        jukyo = ""
+        if "적요" in col_map:
+            jukyo = _safe_str(df.iloc[ri, col_map["적요"]])
+
+        # 구간 정보
+        route = {}
+        for rk in route_keys:
+            if rk in col_map:
+                route[rk] = _safe_str(df.iloc[ri, col_map[rk]])
             else:
-                costs[h] = 0.0
+                route[rk] = ""
 
         rows.append({
             "container_no": container_no,
@@ -143,7 +159,9 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
             "gubun": gubun,
             "costs": costs,
             "cost_sum": sum(costs.values()),
-            "row_number": ri + 1,  # 엑셀 행번호 (1-based)
+            "jukyo": jukyo,
+            "route": route,
+            "row_number": ri + 1,
         })
 
     return {
@@ -155,7 +173,7 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
 def run_mobis_verification(filename: str, parsed: dict) -> dict:
     """
     모비스 검증 실행.
-    (컨테이너번호, C/INV번호) 중복 제거 → 구분별 합계 비교 → 오류 판정.
+    오류 조건: GROVE ODCY 전송 행이 존재하면 무조건 오류.
     """
     rows = parsed["rows"]
     cost_headers = parsed["cost_headers"]
@@ -178,12 +196,15 @@ def run_mobis_verification(filename: str, parsed: dict) -> dict:
         container_no, c_inv_no = key
         group_rows = groups[key]
 
-        # 구분별 합계 계산
+        # 구분별 합계 + 항목별 세부값 계산
         cat_sums = {}
         cat_details = {}
+        has_grove_odcy = False
         for cat in _CATEGORIES:
             matching = [r for r in group_rows if r["gubun"] == cat]
             if matching:
+                if cat == CAT_GROVE_ODCY:
+                    has_grove_odcy = True
                 total = sum(r["cost_sum"] for r in matching)
                 detail = {}
                 for h in cost_headers:
@@ -195,41 +216,60 @@ def run_mobis_verification(filename: str, parsed: dict) -> dict:
                 cat_details[cat] = None
 
         grove_odcy_sum = cat_sums.get(CAT_GROVE_ODCY) or 0.0
-        grove_sum = cat_sums.get(CAT_GROVE)
-        mobis_sum = cat_sums.get(CAT_MOBIS)
+        grove_sum = cat_sums.get(CAT_GROVE) if cat_sums.get(CAT_GROVE) is not None else 0.0
+        mobis_sum = cat_sums.get(CAT_MOBIS) if cat_sums.get(CAT_MOBIS) is not None else 0.0
 
-        # 오류 판정
-        errors = []
-        # 1) GROVE ODCY 전송에 0이 아닌 값 존재
-        if abs(grove_odcy_sum) >= 1:
-            errors.append(f"GROVE ODCY 전송 합계 {grove_odcy_sum:,.0f}원 (0이 아님)")
+        # ── 오류 판정: GROVE ODCY 전송 행이 존재하면 무조건 오류 ──
+        is_error = has_grove_odcy
+        error_reasons = []
+        if has_grove_odcy:
+            error_reasons.append("GROVE ODCY 전송 존재")
 
-        # 2) GROVE 전송 ≠ MOBIS 산출
-        if grove_sum is not None and mobis_sum is not None:
-            if abs(grove_sum - mobis_sum) >= 1:
-                errors.append(f"GROVE 전송({grove_sum:,.0f}) ≠ MOBIS 산출({mobis_sum:,.0f})")
-        elif grove_sum is not None or mobis_sum is not None:
-            errors.append("GROVE 전송 또는 MOBIS 산출 데이터 누락")
-
-        is_error = len(errors) > 0
         if is_error:
             error_count += 1
         else:
             ok_count += 1
 
+        # 적요 수집 (GROVE ODCY 전송 행 우선, 없으면 아무 행)
+        jukyo = ""
+        grove_odcy_rows = [r for r in group_rows if r["gubun"] == CAT_GROVE_ODCY]
+        if grove_odcy_rows:
+            jukyo = grove_odcy_rows[0].get("jukyo", "")
+        if not jukyo:
+            for r in group_rows:
+                if r.get("jukyo"):
+                    jukyo = r["jukyo"]
+                    break
+
+        # 구간 정보 (MOBIS 산출 행에서 가져오기)
+        route_info = {"출발지": "", "작업지": "", "경유지": "", "도착지": "", "ODCY도착지": ""}
+        mobis_rows = [r for r in group_rows if r["gubun"] == CAT_MOBIS]
+        if mobis_rows:
+            route_info = mobis_rows[0].get("route", route_info)
+
+        # 세부 비교: GROVE 전송 vs MOBIS 산출 항목별 차이 (오류행용)
+        detail_diffs = {}
+        grove_detail = cat_details.get(CAT_GROVE) or {}
+        mobis_detail = cat_details.get(CAT_MOBIS) or {}
+        for h in cost_headers:
+            gv = grove_detail.get(h, 0.0)
+            mv = mobis_detail.get(h, 0.0)
+            detail_diffs[h] = abs(gv - mv) >= 1
+
         result = {
             "container_no": container_no,
             "c_inv_no": c_inv_no,
-            "grove_odcy_sum": grove_odcy_sum,
-            "grove_sum": grove_sum if grove_sum is not None else 0.0,
-            "mobis_sum": mobis_sum if mobis_sum is not None else 0.0,
-            "grove_odcy_detail": cat_details.get(CAT_GROVE_ODCY),
-            "grove_detail": cat_details.get(CAT_GROVE),
-            "mobis_detail": cat_details.get(CAT_MOBIS),
-            "diff": (grove_sum or 0.0) - (mobis_sum or 0.0),
             "is_error": is_error,
-            "error_reasons": errors,
             "status": "오류" if is_error else "정상",
+            "error_reasons": error_reasons,
+            "jukyo": jukyo,
+            "grove_odcy_sum": grove_odcy_sum,
+            "grove_sum": grove_sum,
+            "mobis_sum": mobis_sum,
+            "grove_detail": grove_detail,
+            "mobis_detail": mobis_detail,
+            "detail_diffs": detail_diffs,
+            "route": route_info,
         }
         results.append(result)
 
@@ -253,59 +293,131 @@ def generate_mobis_report(verification: dict) -> bytes:
 
     FILL_ERROR = PatternFill("solid", fgColor="FFC7CE")
     FILL_OK = PatternFill("solid", fgColor="FFFFFF")
-    FILL_HEADER = PatternFill("solid", fgColor="4472C4")
-    FILL_HEADER2 = PatternFill("solid", fgColor="D6E4F0")
+    FILL_YELLOW = PatternFill("solid", fgColor="FFFF00")
+    FILL_HEADER_MAIN = PatternFill("solid", fgColor="374151")
+    FILL_HEADER_GROVE = PatternFill("solid", fgColor="1A73E8")
+    FILL_HEADER_MOBIS = PatternFill("solid", fgColor="0F766E")
+    FILL_HEADER_ROUTE = PatternFill("solid", fgColor="6B21A8")
 
     FONT_HEADER = Font(bold=True, color="FFFFFF", size=10)
-    FONT_HEADER2 = Font(bold=True, color="1F4E79", size=10)
     FONT_ERROR = Font(color="9C0006", size=10)
     FONT_NORMAL = Font(size=10)
 
-    headers = ["컨테이너 번호", "C/INV 번호",
-               f"GROVE ODCY 전송\n합계", f"GROVE 전송\n합계", f"MOBIS 산출\n합계",
-               "차이\n(GROVE-MOBIS)", "결과", "오류 사유"]
+    nc = len(cost_headers)  # 비용 항목 수
 
-    # Row 1: 헤더
-    ws.append(headers)
-    for ci, cell in enumerate(ws[1], 1):
-        cell.fill = FILL_HEADER
+    # ── Row 1: 그룹 헤더 (병합) ─────────────────────────────
+    ws.append([""] * (9 + nc * 2 + 5))
+    # 기본 정보 (1~9)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
+    c = ws.cell(row=1, column=1, value="기본 정보")
+    c.fill = FILL_HEADER_MAIN; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
+    # GROVE 전송 세부 (10 ~ 9+nc)
+    gs = 10; ge = 9 + nc
+    ws.merge_cells(start_row=1, start_column=gs, end_row=1, end_column=ge)
+    c = ws.cell(row=1, column=gs, value="GROVE 전송 세부")
+    c.fill = FILL_HEADER_GROVE; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
+    # MOBIS 산출 세부 (ge+1 ~ ge+nc)
+    ms = ge + 1; me = ge + nc
+    ws.merge_cells(start_row=1, start_column=ms, end_row=1, end_column=me)
+    c = ws.cell(row=1, column=ms, value="MOBIS 산출 세부")
+    c.fill = FILL_HEADER_MOBIS; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
+    # 구간 (me+1 ~ me+5)
+    rs = me + 1; re = me + 5
+    ws.merge_cells(start_row=1, start_column=rs, end_row=1, end_column=re)
+    c = ws.cell(row=1, column=rs, value="구간 (MOBIS 산출)")
+    c.fill = FILL_HEADER_ROUTE; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 22
+
+    # ── Row 2: 개별 컬럼 헤더 ───────────────────────────────
+    headers2 = [
+        "#", "컨테이너 번호", "C/INV 번호",
+        "결과", "오류사유", "오류사유_모비스",
+        "GROVE ODCY\n전송 합계", "GROVE 전송\n합계", "MOBIS 산출\n합계",
+    ]
+    headers2 += [f"G_{h}" for h in cost_headers]
+    headers2 += [f"M_{h}" for h in cost_headers]
+    headers2 += ["출발지", "작업지", "경유지", "도착지", "ODCY도착지"]
+
+    ws.append(headers2)
+    header_fills = (
+        [FILL_HEADER_MAIN] * 9
+        + [FILL_HEADER_GROVE] * nc
+        + [FILL_HEADER_MOBIS] * nc
+        + [FILL_HEADER_ROUTE] * 5
+    )
+    for ci, cell in enumerate(ws[2], 1):
+        cell.fill = header_fills[ci - 1] if ci - 1 < len(header_fills) else FILL_HEADER_MAIN
         cell.font = FONT_HEADER
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    ws.row_dimensions[1].height = 36
+    ws.row_dimensions[2].height = 36
 
     money_fmt = '#,##0'
-    for r in verification["results"]:
+
+    for idx, r in enumerate(verification["results"], 1):
+        is_err = r["is_error"]
+        gd = r.get("grove_detail") or {}
+        md = r.get("mobis_detail") or {}
+        dd = r.get("detail_diffs") or {}
+        rt = r.get("route") or {}
+
         row_data = [
-            r["container_no"],
-            r["c_inv_no"],
-            r["grove_odcy_sum"],
-            r["grove_sum"],
-            r["mobis_sum"],
-            r["diff"],
+            idx,
+            r["container_no"], r["c_inv_no"],
             r["status"],
             " / ".join(r["error_reasons"]) if r["error_reasons"] else "",
+            r.get("jukyo", ""),
+            r["grove_odcy_sum"], r["grove_sum"], r["mobis_sum"],
         ]
+        # GROVE 세부
+        for h in cost_headers:
+            row_data.append(gd.get(h, 0.0) if is_err else "")
+        # MOBIS 세부
+        for h in cost_headers:
+            row_data.append(md.get(h, 0.0) if is_err else "")
+        # 구간
+        row_data += [rt.get("출발지", ""), rt.get("작업지", ""), rt.get("경유지", ""),
+                     rt.get("도착지", ""), rt.get("ODCY도착지", "")]
+
         ws.append(row_data)
         excel_row = ws.max_row
-        is_err = r["is_error"]
+        base_fill = FILL_ERROR if is_err else FILL_OK
+        base_font = FONT_ERROR if is_err else FONT_NORMAL
+
         for ci in range(1, len(row_data) + 1):
             cell = ws.cell(row=excel_row, column=ci)
-            if is_err:
-                cell.fill = FILL_ERROR
-                cell.font = FONT_ERROR
-            else:
-                cell.fill = FILL_OK
-                cell.font = FONT_NORMAL
+            cell.fill = base_fill
+            cell.font = base_font
             cell.alignment = Alignment(vertical="center")
-            if ci in (3, 4, 5, 6):
+            if ci in (7, 8, 9):
                 cell.number_format = money_fmt
 
-    # 열 너비
-    widths = [18, 18, 18, 18, 18, 18, 8, 40]
-    for i, w in enumerate(widths, 1):
-        ws.column_dimensions[get_column_letter(i)].width = w
+        # 세부 비용 금액 포맷 + 노란 음영
+        if is_err:
+            for i, h in enumerate(cost_headers):
+                # GROVE 세부 셀
+                g_ci = 10 + i
+                cell_g = ws.cell(row=excel_row, column=g_ci)
+                cell_g.number_format = money_fmt
+                # MOBIS 세부 셀
+                m_ci = 10 + nc + i
+                cell_m = ws.cell(row=excel_row, column=m_ci)
+                cell_m.number_format = money_fmt
+                # 차이나는 항목 → 노란 음영
+                if dd.get(h, False):
+                    cell_g.fill = FILL_YELLOW
+                    cell_m.fill = FILL_YELLOW
 
-    ws.freeze_panes = "A2"
+    # ── 열 너비 ─────────────────────────────────────────────
+    base_widths = [5, 18, 18, 8, 24, 24, 16, 16, 16]
+    for i, w in enumerate(base_widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    for i in range(nc * 2):
+        ws.column_dimensions[get_column_letter(10 + i)].width = 14
+    route_start = 10 + nc * 2
+    for i in range(5):
+        ws.column_dimensions[get_column_letter(route_start + i)].width = 12
+
+    ws.freeze_panes = "A3"
 
     buf = BytesIO()
     wb.save(buf)
