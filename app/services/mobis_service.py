@@ -43,14 +43,14 @@ def _safe_str(value) -> str:
 def _find_header_columns(df: pd.DataFrame) -> dict:
     """
     1:2행 병합 헤더에서 필요 컬럼 위치를 찾는다.
-    2-pass: 정확 매칭 우선, 미발견 헤더만 부분 매칭.
+    비용 항목(_COST_HEADERS)은 우측(마지막) 매칭 우선 — 동일 헤더가
+    여러 열에 있을 때 실제 비용 데이터가 있는 우측 열을 잡기 위함.
     반환: {header_name: column_index}
     """
     import re
 
     ALL_HEADERS = _REQUIRED_HEADERS + _COST_HEADERS + _EXTRA_HEADERS
     nrows = min(5, len(df))
-    col_map = {}
     dest_cols = []  # "도착지" 중복 처리용
 
     def _norm(text: str) -> str:
@@ -73,16 +73,24 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
                 dest_cols.append(ci)
                 break
 
-    # Pass 1: 개별 후보에서 정확 매칭 (우선)
+    # Pass 1: 정확 매칭 — 모든 발견 위치 수집
+    exact_matches: dict[str, list[int]] = {}
     for ci, candidates in enumerate(col_candidates):
         for header in ALL_HEADERS:
-            if header in col_map:
-                continue
             norm_header = _norm(header)
             for val in candidates:
                 if _norm(val) == norm_header:
-                    col_map[header] = ci
+                    exact_matches.setdefault(header, []).append(ci)
                     break
+
+    # 할당: 비용 항목은 마지막(우측) 매칭, 나머지는 첫(좌측) 매칭
+    col_map = {}
+    for header in ALL_HEADERS:
+        if header in exact_matches:
+            if header in _COST_HEADERS:
+                col_map[header] = exact_matches[header][-1]   # 우측 우선
+            else:
+                col_map[header] = exact_matches[header][0]    # 좌측 우선
 
     # Pass 2: combined 텍스트에서 부분 매칭 (미발견 헤더만)
     for ci, candidates in enumerate(col_candidates):
@@ -180,9 +188,20 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
             "row_number": ri + 1,
         })
 
+    # 비용 컬럼 디버그 정보 (엑셀 열 문자 표시)
+    from openpyxl.utils import get_column_letter
+    debug_cost_cols = {}
+    for h in _COST_HEADERS:
+        if h in col_map:
+            ci = col_map[h]
+            debug_cost_cols[h] = f"{get_column_letter(ci + 1)}(col {ci})"
+        else:
+            debug_cost_cols[h] = "미발견"
+
     return {
         "rows": rows,
         "cost_headers": found_costs,
+        "debug_cost_cols": debug_cost_cols,
     }
 
 
@@ -359,6 +378,7 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
         "ok_count": ok_count,
         "cost_headers": cost_headers,
         "results": results,
+        "debug_cost_cols": parsed.get("debug_cost_cols") if isinstance(parsed, dict) else None,
     }
 
 
