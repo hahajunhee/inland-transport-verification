@@ -2,21 +2,31 @@
 3단계 모비스 검증 API 라우터
 """
 from io import BytesIO
+from typing import Optional
 from urllib.parse import quote
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app import data_store
 from app.services.mobis_service import (
     parse_mobis_excel,
     run_mobis_verification,
+    build_ref_lookup,
     generate_mobis_report,
 )
 
 router = APIRouter()
 
 
+@router.get("/sessions")
+def get_verification_sessions():
+    """2단계 정산검증 세션 목록 반환 (참조용)."""
+    sessions = data_store.load("verification_sessions.json")
+    return sorted(sessions, key=lambda s: s.get("id", 0), reverse=True)
+
+
 @router.post("/upload")
-async def upload_mobis(file: UploadFile = File(...)):
+async def upload_mobis(file: UploadFile = File(...), session_id: Optional[int] = None):
     if not file.filename.endswith((".xlsx", ".xls")):
         raise HTTPException(400, "엑셀 파일(.xlsx, .xls)만 지원합니다.")
     try:
@@ -27,7 +37,15 @@ async def upload_mobis(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(400, f"파일 파싱 실패: {e}")
 
-    result = run_mobis_verification(file.filename, parsed)
+    # 2단계 검증결과 참조 빌드
+    ref_lookup = None
+    if session_id is not None:
+        try:
+            ref_lookup = build_ref_lookup(session_id)
+        except Exception:
+            pass  # 참조 실패 시 무시 (존재X 표시)
+
+    result = run_mobis_verification(file.filename, parsed, ref_lookup)
     return result
 
 

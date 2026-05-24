@@ -9,6 +9,16 @@
 <!-- 업로드 -->
 <div class="card">
   <h2 class="card-title">엑셀 파일 업로드</h2>
+
+  <!-- 2단계 정산검증 세션 선택 -->
+  <div class="ref-session-row">
+    <label class="ref-label">2단계 정산검증 참조:</label>
+    <select id="ref-session-select" class="ref-select">
+      <option value="">선택 안함 (참조 없이 검증)</option>
+    </select>
+    <span class="ref-hint">선택하면 검증결과의 픽업지명/출하지명/ODCY코드/도착지포트구분/ODCY도착지명을 키매칭하여 표시합니다.</span>
+  </div>
+
   <div id="drop-zone" class="drop-zone">
     <div class="drop-icon">📂</div>
     <div class="drop-text">모비스 정산 엑셀 파일을 여기에 드래그하거나 클릭하여 선택</div>
@@ -74,6 +84,7 @@
             <th rowspan="2">MOBIS 산출<br>합계</th>
             <th colspan="5" class="th-grove">GROVE 전송 세부</th>
             <th colspan="5" class="th-mobis">MOBIS 산출 세부</th>
+            <th colspan="5" class="th-ref">정산검증 참조</th>
             <th colspan="5" class="th-route">구간 (MOBIS 산출)</th>
           </tr>
           <!-- Row 2: 세부 항목 -->
@@ -88,6 +99,11 @@
             <th class="th-mobis">상하차료</th>
             <th class="th-mobis">셔틀료</th>
             <th class="th-mobis">대기료</th>
+            <th class="th-ref">픽업지명</th>
+            <th class="th-ref">출하지명</th>
+            <th class="th-ref">ODCY코드</th>
+            <th class="th-ref">도착지<br>포트구분</th>
+            <th class="th-ref">ODCY<br>도착지명</th>
             <th class="th-route">출발지</th>
             <th class="th-route">작업지</th>
             <th class="th-route">경유지</th>
@@ -96,7 +112,7 @@
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="24" class="empty-msg">파일을 업로드하세요.</td></tr>
+          <tr><td colspan="29" class="empty-msg">파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>
@@ -128,9 +144,29 @@
   margin-left: 8px;
 }
 
+/* 세션 선택 */
+.ref-session-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.ref-label { font-size: 13px; font-weight: 700; color: #374151; white-space: nowrap; }
+.ref-select {
+  padding: 6px 10px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-size: 13px;
+  min-width: 300px;
+  font-family: inherit;
+}
+.ref-hint { font-size: 11px; color: #888; }
+
 /* 그룹 헤더 색상 */
 .th-grove { background: #e8f0fe !important; color: #1a73e8; }
 .th-mobis { background: #ccfbf1 !important; color: #0f766e; }
+.th-ref   { background: #fef3c7 !important; color: #92400e; }
 .th-route { background: #f3e8ff !important; color: #6b21a8; }
 
 /* 행 상태 */
@@ -141,6 +177,9 @@
 
 /* 노란 음영: 차이나는 항목 */
 .cell-diff-yellow { background: #ffff00 !important; font-weight: 700; }
+
+/* 존재X 표시 */
+.ref-missing { color: #dc2626; font-weight: 700; font-size: 11px; }
 
 .reason-cell {
   text-align: left !important;
@@ -170,11 +209,30 @@
 <script>
 const API_BASE = '/api/mobis';
 const COST_KEYS = ['내륙운임', '보관료', '상하차료', '셔틀료', '대기료'];
+const REF_KEYS = ['pickup_name', 'departure_name', 'odcy_code', 'dest_port_type', 'odcy_destination_name'];
 const ROUTE_KEYS = ['출발지', '작업지', '경유지', '도착지', 'ODCY도착지'];
 let currentFile = null;
 let allResults = [];
 let lastVerification = null;
 let currentFilter = 'ALL';
+
+// ── 세션 목록 로드 ────────────────────────────────────────
+async function loadSessions() {
+  try {
+    const resp = await fetch(`${API_BASE}/sessions`);
+    if (!resp.ok) return;
+    const sessions = await resp.json();
+    const sel = document.getElementById('ref-session-select');
+    sessions.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.id;
+      const dt = s.uploaded_at ? ` (${s.uploaded_at})` : '';
+      opt.textContent = `#${s.id} ${s.filename || ''}${dt} — ${s.total_rows || 0}건`;
+      sel.appendChild(opt);
+    });
+  } catch {}
+}
+loadSessions();
 
 // ── 드래그 & 드롭 ──────────────────────────────────────────
 const dropZone = document.getElementById('drop-zone');
@@ -220,7 +278,13 @@ async function uploadFile() {
   try {
     const fd = new FormData();
     fd.append('file', currentFile);
-    const resp = await fetch(`${API_BASE}/upload`, { method: 'POST', body: fd });
+
+    // 세션 선택 시 query param 추가
+    const sessionId = document.getElementById('ref-session-select').value;
+    let url = `${API_BASE}/upload`;
+    if (sessionId) url += `?session_id=${sessionId}`;
+
+    const resp = await fetch(url, { method: 'POST', body: fd });
     if (!resp.ok) {
       const err = await resp.json();
       throw new Error(err.detail || '검증 실패');
@@ -256,7 +320,7 @@ function renderTable() {
   }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="24" class="empty-msg">${currentFilter === 'ERROR' ? '오류 건이 없습니다.' : '결과가 없습니다.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="29" class="empty-msg">${currentFilter === 'ERROR' ? '오류 건이 없습니다.' : '결과가 없습니다.'}</td></tr>`;
     document.getElementById('result-count').textContent = '';
     return;
   }
@@ -268,7 +332,6 @@ function renderTable() {
     const rowClass = isErr ? 'row-error' : '';
     const statusClass = isErr ? 'error-cell' : 'status-ok';
 
-    // 기본 열
     let html = `<tr class="${rowClass}">`;
     html += `<td>${i + 1}</td>`;
     html += `<td>${r.container_no || ''}</td>`;
@@ -285,29 +348,32 @@ function renderTable() {
     const md = r.mobis_detail || {};
     const dd = r.detail_diffs || {};
 
-    // GROVE 전송 세부 5열
     COST_KEYS.forEach(k => {
       if (isErr) {
-        const isDiff = dd[k];
-        const cls = isDiff ? 'cell-diff-yellow' : '';
+        const cls = dd[k] ? 'cell-diff-yellow' : '';
         html += `<td class="${cls}">${fmt(gd[k] || 0)}</td>`;
       } else {
         html += `<td class="detail-empty">-</td>`;
       }
     });
-
-    // MOBIS 산출 세부 5열
     COST_KEYS.forEach(k => {
       if (isErr) {
-        const isDiff = dd[k];
-        const cls = isDiff ? 'cell-diff-yellow' : '';
+        const cls = dd[k] ? 'cell-diff-yellow' : '';
         html += `<td class="${cls}">${fmt(md[k] || 0)}</td>`;
       } else {
         html += `<td class="detail-empty">-</td>`;
       }
     });
 
-    // 구간 5열 (MOBIS 산출 — 모든 행 표시)
+    // 정산검증 참조 5열
+    const rf = r.ref || {};
+    REF_KEYS.forEach(k => {
+      const v = rf[k] || '';
+      const cls = v === '존재X' ? 'ref-missing' : '';
+      html += `<td class="${cls}">${v}</td>`;
+    });
+
+    // 구간 5열
     const rt = r.route || {};
     ROUTE_KEYS.forEach(k => {
       html += `<td>${rt[k] || ''}</td>`;

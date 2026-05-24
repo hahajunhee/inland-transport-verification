@@ -170,12 +170,33 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
     }
 
 
-def run_mobis_verification(filename: str, parsed: dict) -> dict:
+_REF_FIELDS = ["pickup_name", "departure_name", "odcy_code", "dest_port_type", "odcy_destination_name"]
+_REF_EMPTY = {f: "존재X" for f in _REF_FIELDS}
+
+
+def build_ref_lookup(session_id: int) -> dict:
+    """2단계 검증결과에서 (c_invoice_no, container_no) → 참조 데이터 dict 빌드."""
+    from app import data_store
+    results = data_store.load_results(session_id)
+    lookup = {}
+    for r in results:
+        c_inv = (r.get("c_invoice_no") or "").strip()
+        cont = (r.get("container_no") or "").strip()
+        if not c_inv and not cont:
+            continue
+        key = (c_inv, cont)
+        if key not in lookup:
+            lookup[key] = {f: (r.get(f) or "") for f in _REF_FIELDS}
+    return lookup
+
+
+def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None) -> dict:
     """
     모비스 검증 실행.
     오류 조건:
       1) GROVE 전송 합계 ≠ MOBIS 산출 합계
       2) GROVE ODCY 전송 행이 존재
+    ref_lookup: build_ref_lookup()으로 생성한 2단계 검증결과 참조 dict (선택).
     """
     rows = parsed["rows"]
     cost_headers = parsed["cost_headers"]
@@ -253,6 +274,13 @@ def run_mobis_verification(filename: str, parsed: dict) -> dict:
         if mobis_rows:
             route_info = mobis_rows[0].get("route", route_info)
 
+        # 정산검증 참조 (2단계 검증결과에서 키 매칭)
+        ref = dict(_REF_EMPTY) if ref_lookup is not None else {f: "" for f in _REF_FIELDS}
+        if ref_lookup is not None:
+            ref_key = (c_inv_no, container_no)
+            if ref_key in ref_lookup:
+                ref = ref_lookup[ref_key]
+
         # 세부 비교: GROVE 전송 vs MOBIS 산출 항목별 차이 (오류행용)
         detail_diffs = {}
         grove_detail = cat_details.get(CAT_GROVE) or {}
@@ -276,6 +304,7 @@ def run_mobis_verification(filename: str, parsed: dict) -> dict:
             "mobis_detail": mobis_detail,
             "detail_diffs": detail_diffs,
             "route": route_info,
+            "ref": ref,
         }
         results.append(result)
 
@@ -310,9 +339,13 @@ def generate_mobis_report(verification: dict) -> bytes:
     FONT_NORMAL = Font(size=10)
 
     nc = len(cost_headers)  # 비용 항목 수
+    _REF_LABELS = ["픽업지명", "출하지명", "ODCY코드", "도착지포트구분", "ODCY도착지명"]
+    _ROUTE_LABELS = ["출발지", "작업지", "경유지", "도착지", "ODCY도착지"]
+    FILL_HEADER_REF = PatternFill("solid", fgColor="B45309")
 
     # ── Row 1: 그룹 헤더 (병합) ─────────────────────────────
-    ws.append([""] * (9 + nc * 2 + 5))
+    total_cols = 9 + nc * 2 + 5 + 5  # 기본+GROVE+MOBIS+정산참조+구간
+    ws.append([""] * total_cols)
     # 기본 정보 (1~9)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
     c = ws.cell(row=1, column=1, value="기본 정보")
@@ -327,10 +360,15 @@ def generate_mobis_report(verification: dict) -> bytes:
     ws.merge_cells(start_row=1, start_column=ms, end_row=1, end_column=me)
     c = ws.cell(row=1, column=ms, value="MOBIS 산출 세부")
     c.fill = FILL_HEADER_MOBIS; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
-    # 구간 (me+1 ~ me+5)
-    rs = me + 1; re = me + 5
-    ws.merge_cells(start_row=1, start_column=rs, end_row=1, end_column=re)
-    c = ws.cell(row=1, column=rs, value="구간 (MOBIS 산출)")
+    # 정산검증 참조 (me+1 ~ me+5)
+    refs = me + 1; refe = me + 5
+    ws.merge_cells(start_row=1, start_column=refs, end_row=1, end_column=refe)
+    c = ws.cell(row=1, column=refs, value="정산검증 참조")
+    c.fill = FILL_HEADER_REF; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
+    # 구간 (refe+1 ~ refe+5)
+    rts = refe + 1; rte = refe + 5
+    ws.merge_cells(start_row=1, start_column=rts, end_row=1, end_column=rte)
+    c = ws.cell(row=1, column=rts, value="구간 (MOBIS 산출)")
     c.fill = FILL_HEADER_ROUTE; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 22
 
@@ -342,13 +380,15 @@ def generate_mobis_report(verification: dict) -> bytes:
     ]
     headers2 += [f"G_{h}" for h in cost_headers]
     headers2 += [f"M_{h}" for h in cost_headers]
-    headers2 += ["출발지", "작업지", "경유지", "도착지", "ODCY도착지"]
+    headers2 += _REF_LABELS
+    headers2 += _ROUTE_LABELS
 
     ws.append(headers2)
     header_fills = (
         [FILL_HEADER_MAIN] * 9
         + [FILL_HEADER_GROVE] * nc
         + [FILL_HEADER_MOBIS] * nc
+        + [FILL_HEADER_REF] * 5
         + [FILL_HEADER_ROUTE] * 5
     )
     for ci, cell in enumerate(ws[2], 1):
@@ -364,6 +404,7 @@ def generate_mobis_report(verification: dict) -> bytes:
         gd = r.get("grove_detail") or {}
         md = r.get("mobis_detail") or {}
         dd = r.get("detail_diffs") or {}
+        rf = r.get("ref") or {}
         rt = r.get("route") or {}
 
         row_data = [
@@ -380,6 +421,8 @@ def generate_mobis_report(verification: dict) -> bytes:
         # MOBIS 세부
         for h in cost_headers:
             row_data.append(md.get(h, 0.0) if is_err else "")
+        # 정산검증 참조
+        row_data += [rf.get(f, "") for f in _REF_FIELDS]
         # 구간
         row_data += [rt.get("출발지", ""), rt.get("작업지", ""), rt.get("경유지", ""),
                      rt.get("도착지", ""), rt.get("ODCY도착지", "")]
@@ -419,7 +462,10 @@ def generate_mobis_report(verification: dict) -> bytes:
         ws.column_dimensions[get_column_letter(i)].width = w
     for i in range(nc * 2):
         ws.column_dimensions[get_column_letter(10 + i)].width = 14
-    route_start = 10 + nc * 2
+    ref_start = 10 + nc * 2
+    for i in range(5):
+        ws.column_dimensions[get_column_letter(ref_start + i)].width = 16
+    route_start = ref_start + 5
     for i in range(5):
         ws.column_dimensions[get_column_letter(route_start + i)].width = 12
 
