@@ -43,39 +43,55 @@ def _safe_str(value) -> str:
 def _find_header_columns(df: pd.DataFrame) -> dict:
     """
     1:2행 병합 헤더에서 필요 컬럼 위치를 찾는다.
+    2-pass: 정확 매칭 우선, 미발견 헤더만 부분 매칭.
     반환: {header_name: column_index}
     """
+    import re
+
     ALL_HEADERS = _REQUIRED_HEADERS + _COST_HEADERS + _EXTRA_HEADERS
     nrows = min(5, len(df))
     col_map = {}
     dest_cols = []  # "도착지" 중복 처리용
 
+    def _norm(text: str) -> str:
+        """모든 공백(\n, \r, \t, 스페이스 등) 제거."""
+        return re.sub(r'\s+', '', text)
+
+    # 각 컬럼의 후보 텍스트 수집
+    col_candidates = []
     for ci in range(len(df.columns)):
         candidates = []
         for ri in range(nrows):
             val = str(df.iloc[ri, ci]).strip()
             if val and val != "nan":
                 candidates.append(val)
-        combined = "\n".join(candidates)
+        col_candidates.append(candidates)
 
         # "도착지" 개별 수집 (중복 가능 — 구간/ODCY)
         for val in candidates:
-            if val.replace(" ", "") == "도착지":
+            if _norm(val) == "도착지":
                 dest_cols.append(ci)
                 break
 
-        # 일반 헤더 매칭
+    # Pass 1: 개별 후보에서 정확 매칭 (우선)
+    for ci, candidates in enumerate(col_candidates):
         for header in ALL_HEADERS:
-            norm_header = header.replace("\n", "").replace(" ", "")
-            # combined에서 검색
-            norm_combined = combined.replace("\n", "").replace(" ", "")
-            if norm_header in norm_combined and header not in col_map:
-                col_map[header] = ci
-            # 개별 후보에서 정확 매칭
+            if header in col_map:
+                continue
+            norm_header = _norm(header)
             for val in candidates:
-                norm_val = val.replace("\n", "").replace(" ", "")
-                if norm_val == norm_header and header not in col_map:
+                if _norm(val) == norm_header:
                     col_map[header] = ci
+                    break
+
+    # Pass 2: combined 텍스트에서 부분 매칭 (미발견 헤더만)
+    for ci, candidates in enumerate(col_candidates):
+        norm_combined = _norm("".join(candidates))
+        for header in ALL_HEADERS:
+            if header in col_map:
+                continue
+            if _norm(header) in norm_combined:
+                col_map[header] = ci
 
     # "도착지" 중복 처리: 첫번째=구간 도착지, 두번째=ODCY 도착지
     if len(dest_cols) >= 2:
