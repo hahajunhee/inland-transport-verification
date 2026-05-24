@@ -85,21 +85,38 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
 
     # 할당
     col_map = {}
-    # 비용 항목: 유일 매칭 컬럼들의 평균 위치(앵커)에 가까운 쪽 선택
-    single_positions = []
-    for h in _COST_HEADERS:
-        if h in exact_matches and len(exact_matches[h]) == 1:
-            single_positions.append(exact_matches[h][0])
-    anchor = (sum(single_positions) / len(single_positions)) if single_positions else None
 
+    # 비용 항목: 클러스터 기반 — 인접한 컬럼 그룹 중 가장 많은
+    # 고유 비용 헤더를 포함하는 클러스터를 선택
+    cost_col_info = []
+    for h in _COST_HEADERS:
+        for ci in exact_matches.get(h, []):
+            cost_col_info.append((ci, h))
+    cost_col_info.sort()
+
+    if cost_col_info:
+        # 클러스터링: 간격 10 이내를 같은 그룹으로
+        clusters = [[cost_col_info[0]]]
+        for ci, h in cost_col_info[1:]:
+            if ci - clusters[-1][-1][0] <= 10:
+                clusters[-1].append((ci, h))
+            else:
+                clusters.append([(ci, h)])
+
+        # 가장 많은 고유 헤더를 가진 클러스터 (동률 시 우측 우선)
+        best = max(clusters, key=lambda c: (
+            len(set(h for _, h in c)),
+            max(ci for ci, _ in c),
+        ))
+        for ci, h in best:
+            col_map[h] = ci
+
+    # 나머지 헤더 (비-비용): 좌측 첫 매칭
     for header in ALL_HEADERS:
-        if header not in exact_matches:
+        if header in col_map:
             continue
-        matches = exact_matches[header]
-        if header in _COST_HEADERS and len(matches) > 1 and anchor is not None:
-            col_map[header] = min(matches, key=lambda ci: abs(ci - anchor))
-        else:
-            col_map[header] = matches[0]    # 기본: 좌측 우선
+        if header in exact_matches:
+            col_map[header] = exact_matches[header][0]
 
     # Pass 2: combined 텍스트에서 부분 매칭 (미발견 헤더만)
     for ci, candidates in enumerate(col_candidates):
