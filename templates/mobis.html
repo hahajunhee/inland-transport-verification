@@ -173,6 +173,7 @@ const COST_KEYS = ['내륙운임', '보관료', '상하차료', '셔틀료', '�
 const ROUTE_KEYS = ['출발지', '작업지', '경유지', '도착지', 'ODCY도착지'];
 let currentFile = null;
 let allResults = [];
+let lastVerification = null;
 let currentFilter = 'ALL';
 
 // ── 드래그 & 드롭 ──────────────────────────────────────────
@@ -225,6 +226,7 @@ async function uploadFile() {
       throw new Error(err.detail || '검증 실패');
     }
     const data = await resp.json();
+    lastVerification = data;
     showResults(data);
   } catch (e) {
     errorDiv.textContent = e.message;
@@ -330,12 +332,19 @@ function setFilter(filter, btn) {
 
 // ── 다운로드 ──────────────────────────────────────────────
 async function downloadReport() {
-  if (!currentFile) return alert('파일을 먼저 업로드하세요.');
+  if (!lastVerification) return alert('검증을 먼저 실행하세요.');
   try {
-    const fd = new FormData();
-    fd.append('file', currentFile);
-    const resp = await fetch(`${API_BASE}/download`, { method: 'POST', body: fd });
-    if (!resp.ok) throw new Error('다운로드 실패');
+    const resp = await fetch(`${API_BASE}/download`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lastVerification),
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      let detail = '다운로드 실패';
+      try { detail = JSON.parse(errText).detail || detail; } catch {}
+      throw new Error(detail);
+    }
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -345,7 +354,9 @@ async function downloadReport() {
     if (m) fname = decodeURIComponent(m[1]);
     a.href = url;
     a.download = fname;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   } catch (e) {
     alert(e.message);
