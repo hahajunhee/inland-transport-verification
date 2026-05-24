@@ -151,6 +151,26 @@ for _tbl, _cols in _SCHEMAS.items():
     _COLUMN_NAMES[_tbl] = [col.split()[0] for col in _cols]
 
 
+# ─── 일괄 로드 캐시 (검증 배치 처리용) ──────────────────────────────────
+
+_load_cache: dict[str, list] = {}
+_load_cache_active: bool = False
+
+
+def begin_cache():
+    """배치 캐시 시작. load() 호출 시 동일 테이블 재조회 없이 캐시 반환."""
+    global _load_cache, _load_cache_active
+    _load_cache = {}
+    _load_cache_active = True
+
+
+def end_cache():
+    """배치 캐시 종료. 캐시 데이터 해제."""
+    global _load_cache, _load_cache_active
+    _load_cache = {}
+    _load_cache_active = False
+
+
 def init_db():
     """모든 테이블 생성 (존재하지 않으면)."""
     conn = _get_conn()
@@ -199,7 +219,9 @@ def _prepare_row(table: str, item: dict) -> dict:
 
 
 def load(filename: str) -> list:
-    """테이블 전체 로드. 파일명으로 테이블 매핑."""
+    """테이블 전체 로드. 파일명으로 테이블 매핑. 캐시 활성 시 재사용."""
+    if _load_cache_active and filename in _load_cache:
+        return _load_cache[filename]
     init_db()
     table = _table_for(filename)
     conn = _get_conn()
@@ -214,6 +236,8 @@ def load(filename: str) -> list:
         if "auto_generated" in d and d["auto_generated"] is not None:
             d["auto_generated"] = bool(d["auto_generated"])
         result.append(d)
+    if _load_cache_active:
+        _load_cache[filename] = result
     return result
 
 
@@ -260,15 +284,15 @@ def load_results(session_id: int) -> list:
 
 
 def save_results(session_id: int, results: list):
-    """세션별 검증 결과 저장."""
+    """세션별 검증 결과 저장 (배치 INSERT)."""
     init_db()
     with _write_lock:
         conn = _get_conn()
         conn.execute("DELETE FROM verification_results WHERE session_id = ?", (session_id,))
-        for item in results:
-            conn.execute(
+        if results:
+            conn.executemany(
                 "INSERT INTO verification_results (session_id, data_json) VALUES (?, ?)",
-                (session_id, json.dumps(item, ensure_ascii=False, default=str)),
+                [(session_id, json.dumps(item, ensure_ascii=False, default=str)) for item in results],
             )
         conn.commit()
 

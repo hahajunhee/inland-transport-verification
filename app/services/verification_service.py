@@ -164,6 +164,14 @@ def _verify_charge(charge_type, actual, pickup_code, odcy_code, dest_code, conta
 
 
 def run_verification(filename: str, rows: list) -> dict:
+    data_store.begin_cache()
+    try:
+        return _run_verification_core(filename, rows)
+    finally:
+        data_store.end_cache()
+
+
+def _run_verification_core(filename: str, rows: list) -> dict:
     sessions = data_store.load("verification_sessions.json")
     session_id = data_store.next_id(sessions)
 
@@ -178,6 +186,118 @@ def run_verification(filename: str, rows: list) -> dict:
         "shuttle_pass": 0, "shuttle_fail": 0, "shuttle_no_rate": 0,
         "total_diff": 0.0,
     }
+
+    # ── 매핑 데이터 일괄 프리로드: dict 기반 O(1) 조회 ──────────────────
+    _pm = data_store.load("port_mappings.json")
+    _om = data_store.load("odcy_mappings.json")
+    _dm = data_store.load("departure_mappings.json")
+    _ct = data_store.load("container_tiers.json")
+    _st = data_store.load("storage_container_tiers.json")
+    _tr = data_store.load("trkv_routes.json")
+
+    port_map = {m["excel_name"].strip(): m for m in _pm}
+    odcy_map = {m["odcy_destination_name"].strip(): m for m in _om}
+    dep_map = {m["departure_name"].strip(): m["departure_code"] for m in _dm}
+    tier_map = {(t["cont_type"], t["is_dg"]): t.get("tier_number") for t in _ct}
+    stier_map = {(t["cont_type"], t["is_dg"]): t.get("tier_number") for t in _st}
+    route_map = {}
+    route_rows = {}
+    for _i, _r in enumerate(_tr, 2):
+        _k = (_r.get("pickup_port"),
+              _r.get("departure_code", _r.get("departure_name", "")),
+              _r.get("dest_port"))
+        if _k not in route_map:
+            route_map[_k] = _r
+            route_rows[_k] = _i
+
+    # ── 인라인 조회 헬퍼 (dict O(1)) ────────────────────────────────────
+
+    def _rp(name):
+        """resolve_port — O(1)"""
+        if not name:
+            return name
+        pm = port_map.get(name.strip())
+        return pm["port_type"] if pm else name
+
+    def _rpt(name):
+        """resolve_port_terminal_type — O(1)"""
+        if not name:
+            return ""
+        pm = port_map.get(name.strip())
+        return (pm.get("terminal_type") or "") if pm else ""
+
+    def _rd(name):
+        """resolve_departure — O(1)"""
+        if not name:
+            return name
+        return dep_map.get(name.strip(), name)
+
+    def _ron(name):
+        """resolve_odcy_name — O(1)"""
+        if not name:
+            return name
+        m = odcy_map.get(name.strip())
+        return m["odcy_name"] if m else name
+
+    def _rtt(name):
+        """resolve_terminal_type — O(1)"""
+        if not name:
+            return ""
+        m = odcy_map.get(name.strip())
+        return (m.get("odcy_terminal_type") or m.get("terminal_type") or "") if m else ""
+
+    def _rol(name):
+        """resolve_odcy_location — O(1)"""
+        if not name:
+            return ""
+        m = odcy_map.get(name.strip())
+        return (m.get("odcy_location") or "") if m else ""
+
+    def _omd(name):
+        """_resolve_om_d — O(1)"""
+        if not name:
+            return None
+        n = name.strip()
+        if not n:
+            return None
+        m = odcy_map.get(n)
+        if m:
+            loc = m.get("odcy_location") or ""
+            return loc.strip() if loc.strip() else None
+        return None
+
+    def _gstn(ct, dg):
+        """get_storage_tier_number — O(1)"""
+        c = str(ct or "").strip()
+        d = str(dg or "").strip().upper() == "X"
+        return stier_map.get((c, d))
+
+    def _trkv_lookup(pp, dp, dc, ct, dg, qty, wh):
+        """get_trkv_details 인라인 — O(1) dict 조회"""
+        r = {"tier_number": None, "unit_rate": None, "expected": None, "route_row_num": None}
+        ig = str(dg or "").strip().upper() == "X"
+        c = str(ct or "").strip()
+        tn = tier_map.get((c, ig))
+        if tn is None:
+            return r
+        r["tier_number"] = tn
+        dk = str(dc or "").strip()
+        rk = (pp, dk, dp)
+        route = route_map.get(rk)
+        if not route:
+            return r
+        r["route_row_num"] = route_rows.get(rk)
+        price = route.get(f"tier{tn}")
+        if price is None:
+            return r
+        r["unit_rate"] = price
+        if str(wh or "").strip().upper() == "X":
+            r["expected"] = round(price * 1.2 * qty, -2)
+        else:
+            r["expected"] = price * qty
+        return r
+
+    # ── 행별 검증 루프 ──────────────────────────────────────────────────
 
     prefix_map = {"TRKV": "trkv", "보관료": "storage", "상하차료": "handling", "셔틀비용": "shuttle"}
     total_diff = 0.0
@@ -198,32 +318,35 @@ def run_verification(filename: str, rows: list) -> dict:
         weekend_holiday        = str(row.get("weekend_holiday") or "").strip().upper()
         odcy_destination_name  = row.get("odcy_destination_name")
 
-        # ODCY 매핑 해석 (5개 키 중 3개: odcy_name, odcy_terminal_type, odcy_location)
-        odcy_name_resolved     = resolve_odcy_name(odcy_destination_name or row.get("odcy_name"))
-        odcy_terminal_type     = resolve_terminal_type(odcy_destination_name)
-        odcy_location          = resolve_odcy_location(odcy_destination_name)
+        # ODCY 매핑 해석 — O(1) dict 조회
+        odcy_name_resolved     = _ron(odcy_destination_name or row.get("odcy_name"))
+        odcy_terminal_type     = _rtt(odcy_destination_name)
+        odcy_location          = _rol(odcy_destination_name)
 
-        # OM-D: 상세 ODCY명 → ODCY매핑의 OM-A 매칭 → OM-D(odcy_location) 조회
-        odcy_name_val          = row.get("odcy_name")  # 검증파일의 상세 ODCY명
-        om_d                   = _resolve_om_d(odcy_name_val)
+        # OM-D — O(1) dict 조회
+        odcy_name_val          = row.get("odcy_name")
+        om_d                   = _omd(odcy_name_val)
 
-        # TRKV용 ODCY도착지명: OM-D 값 표시
+        # TRKV용 도착지/포트
         trkv_dest_name         = om_d
-        # TRKV용 도착포트: OM-D 값 기준으로 매핑
         trkv_dest_port         = _resolve_dest_port_by_omd(om_d)
-        # 직반입건(상세ODCY 공란): 도착지명 → 포트명매핑(PM-A→PM-B) 폴백
         if trkv_dest_port is None and (not odcy_destination_name or str(odcy_destination_name).strip() == ""):
-            trkv_dest_port = resolve_port(dest_name)
-        dest_port_type         = resolve_port(dest_name)
-        dest_terminal_type     = resolve_port_terminal_type(dest_name)
+            trkv_dest_port = _rp(dest_name)
+        dest_port_type         = _rp(dest_name)
+        dest_terminal_type     = _rpt(dest_name)
 
-        # 보관료/상하차료/셔틀비 전용 컨테이너 티어
-        storage_tier_number    = get_storage_tier_number(cont_type, dg_raw)
-
-        # 보관일수 계산
+        # 보관료 티어 + 일수 — O(1)
+        storage_tier_number    = _gstn(cont_type, dg_raw)
         odcy_in_date  = row.get("odcy_in_date")
         odcy_out_date = row.get("odcy_out_date")
         raw_days, billable_days, free_days = _calc_storage_days(odcy_in_date, odcy_out_date, odcy_location, storage_tier_number)
+
+        # TRKV 구간 조회 — O(1) (인라인, 중복 제거)
+        pickup_port = _rp(pickup_name)
+        departure_code = _rd(departure_name)
+        trkv_dp = trkv_dest_port if trkv_dest_port else _rp(dest_name)
+        trkv_details = _trkv_lookup(pickup_port, trkv_dp, departure_code,
+                                    cont_type, dg_raw, quantity, weekend_holiday)
 
         result = {
             "id": result_id,
@@ -235,11 +358,11 @@ def run_verification(filename: str, rows: list) -> dict:
             "transport_date": row.get("transport_date"),
             "pickup_code": pickup_code,
             "pickup_name": pickup_name,
-            "pickup_port_resolved": resolve_port(pickup_name),
+            "pickup_port_resolved": pickup_port,
             "odcy_code": odcy_code,
             "odcy_name": row.get("odcy_name"),
             "departure_name": departure_name,
-            "departure_code_resolved": resolve_departure(departure_name),
+            "departure_code_resolved": departure_code,
             "dest_code": dest_code,
             "dest_name_original": dest_name,
             "dest_name": trkv_dest_name,
@@ -251,33 +374,25 @@ def run_verification(filename: str, rows: list) -> dict:
             "om_d": om_d,
             "odcy_destination_name": odcy_destination_name,
             "odcy_name_resolved": odcy_name_resolved,
-            # 구분값 정보 (5개 키)
             "odcy_terminal_type": odcy_terminal_type,
             "odcy_location": odcy_location,
             "dest_port_type": dest_port_type,
             "dest_terminal_type": dest_terminal_type,
-            # 보관료 전용 티어 + 일수
             "storage_tier_number": storage_tier_number,
             "odcy_in_date": odcy_in_date,
             "odcy_out_date": odcy_out_date,
             "storage_days": raw_days,
             "billable_days": billable_days,
             "free_days": free_days,
+            # TRKV 구간 정보
+            "tier_number": trkv_details.get("tier_number"),
+            "trkv_unit_rate": trkv_details.get("unit_rate"),
+            "trkv_rate_row": trkv_details.get("route_row_num"),
         }
-
-        # 티어번호 + 단가 조회 (TRKV 운송 구간 정보에 표시용)
-        trkv_details = get_trkv_details(
-            pickup_name, departure_name, trkv_dest_name, cont_type, dg_raw, quantity, weekend_holiday,
-            dest_port_override=trkv_dest_port,
-        )
-        tier_number = trkv_details.get("tier_number")
-        result["tier_number"]    = tier_number
-        result["trkv_unit_rate"] = trkv_details.get("unit_rate")
-        result["trkv_rate_row"]  = trkv_details.get("route_row_num")
 
         result_id += 1
 
-        # 직반입 판정: ODCY도착지명이 공란이면 터미널 직반입건
+        # 직반입 판정
         is_direct_delivery = not odcy_destination_name or str(odcy_destination_name).strip() == ""
 
         statuses = []
@@ -292,6 +407,19 @@ def run_verification(filename: str, rows: list) -> dict:
                 status = "OK" if abs(diff) < TOLERANCE else "DIFF"
                 rate_row = None
                 unit_rate = None
+            elif charge_type == "TRKV":
+                # 이미 계산된 trkv_details 사용 (중복 조회 제거)
+                expected = trkv_details.get("expected")
+                rate_row = None
+                unit_rate = None
+                if expected is None:
+                    if actual == 0.0:
+                        diff, status = None, "SKIP"
+                    else:
+                        diff, status = None, "NO_RATE"
+                else:
+                    diff = expected - actual
+                    status = "OK" if abs(diff) < TOLERANCE else "DIFF"
             else:
                 expected, diff, status, rate_row, unit_rate = _verify_charge(
                     charge_type, actual, pickup_code, odcy_code, dest_code, container_type,
