@@ -173,6 +173,15 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
 _REF_FIELDS = ["pickup_name", "departure_name", "odcy_code", "dest_port_type", "odcy_destination_name"]
 _REF_EMPTY = {f: "존재X" for f in _REF_FIELDS}
 
+_EXPECTED_FIELDS = ["trkv_expected", "storage_expected", "handling_expected", "shuttle_expected"]
+_EXPECTED_EMPTY = {f: "존재X" for f in _EXPECTED_FIELDS}
+_EXPECTED_TO_MOBIS = {
+    "trkv_expected": "내륙운임",
+    "storage_expected": "보관료",
+    "handling_expected": "상하차료",
+    "shuttle_expected": "셔틀료",
+}
+
 
 def build_ref_lookup(session_id: int) -> dict:
     """2단계 검증결과에서 (c_invoice_no, container_no) → 참조 데이터 dict 빌드."""
@@ -186,7 +195,10 @@ def build_ref_lookup(session_id: int) -> dict:
             continue
         key = (c_inv, cont)
         if key not in lookup:
-            lookup[key] = {f: (r.get(f) or "") for f in _REF_FIELDS}
+            data = {f: (r.get(f) or "") for f in _REF_FIELDS}
+            for f in _EXPECTED_FIELDS:
+                data[f] = r.get(f)
+            lookup[key] = data
     return lookup
 
 
@@ -276,10 +288,14 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
 
         # 정산검증 참조 (2단계 검증결과에서 키 매칭)
         ref = dict(_REF_EMPTY) if ref_lookup is not None else {f: "" for f in _REF_FIELDS}
+        expected = dict(_EXPECTED_EMPTY) if ref_lookup is not None else {f: "" for f in _EXPECTED_FIELDS}
         if ref_lookup is not None:
             ref_key = (c_inv_no, container_no)
             if ref_key in ref_lookup:
-                ref = ref_lookup[ref_key]
+                ref_data = ref_lookup[ref_key]
+                ref = {f: ref_data.get(f, "") for f in _REF_FIELDS}
+                for f in _EXPECTED_FIELDS:
+                    expected[f] = ref_data.get(f)
 
         # 세부 비교: GROVE 전송 vs MOBIS 산출 항목별 차이 (오류행용)
         detail_diffs = {}
@@ -289,6 +305,16 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
             gv = grove_detail.get(h, 0.0)
             mv = mobis_detail.get(h, 0.0)
             detail_diffs[h] = abs(gv - mv) >= 1
+
+        # 예상금액 vs MOBIS 산출 비교
+        expected_diffs = {}
+        for exp_key, mobis_key in _EXPECTED_TO_MOBIS.items():
+            exp_val = expected.get(exp_key)
+            if exp_val is None or exp_val == "" or exp_val == "존재X":
+                expected_diffs[exp_key] = False
+            else:
+                mobis_val = mobis_detail.get(mobis_key, 0.0)
+                expected_diffs[exp_key] = abs(_safe_float(exp_val) - mobis_val) >= 1
 
         result = {
             "container_no": container_no,
@@ -305,6 +331,8 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
             "detail_diffs": detail_diffs,
             "route": route_info,
             "ref": ref,
+            "expected": expected,
+            "expected_diffs": expected_diffs,
         }
         results.append(result)
 
@@ -324,7 +352,7 @@ def generate_mobis_report(verification: dict) -> bytes:
     ws = wb.active
     ws.title = "모비스검증결과"
 
-    cost_headers = verification.get("cost_headers", _COST_HEADERS)
+    cost_headers = _COST_HEADERS  # 항상 5개 비용 항목 사용
 
     FILL_ERROR = PatternFill("solid", fgColor="FFC7CE")
     FILL_OK = PatternFill("solid", fgColor="FFFFFF")
@@ -342,9 +370,11 @@ def generate_mobis_report(verification: dict) -> bytes:
     _REF_LABELS = ["픽업지명", "출하지명", "ODCY코드", "도착지포트구분", "ODCY도착지명"]
     _ROUTE_LABELS = ["출발지", "작업지", "경유지", "도착지", "ODCY도착지"]
     FILL_HEADER_REF = PatternFill("solid", fgColor="B45309")
+    FILL_HEADER_EXPECTED = PatternFill("solid", fgColor="15803D")
+    _EXPECTED_LABELS = ["TRKV예상금액", "보관료예상금액", "상하차료예상금액", "셔틀료예상금액"]
 
     # ── Row 1: 그룹 헤더 (병합) ─────────────────────────────
-    total_cols = 9 + nc * 2 + 5 + 5  # 기본+GROVE+MOBIS+정산참조+구간
+    total_cols = 9 + nc * 2 + 4 + 5 + 5  # 기본+GROVE+MOBIS+정산예상+정산참조+구간
     ws.append([""] * total_cols)
     # 기본 정보 (1~9)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
@@ -360,8 +390,13 @@ def generate_mobis_report(verification: dict) -> bytes:
     ws.merge_cells(start_row=1, start_column=ms, end_row=1, end_column=me)
     c = ws.cell(row=1, column=ms, value="MOBIS 산출 세부")
     c.fill = FILL_HEADER_MOBIS; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
-    # 정산검증 참조 (me+1 ~ me+5)
-    refs = me + 1; refe = me + 5
+    # 정산 예상금액 (me+1 ~ me+4)
+    es = me + 1; ee = me + 4
+    ws.merge_cells(start_row=1, start_column=es, end_row=1, end_column=ee)
+    c = ws.cell(row=1, column=es, value="정산 예상금액")
+    c.fill = FILL_HEADER_EXPECTED; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
+    # 정산검증 참조 (ee+1 ~ ee+5)
+    refs = ee + 1; refe = ee + 5
     ws.merge_cells(start_row=1, start_column=refs, end_row=1, end_column=refe)
     c = ws.cell(row=1, column=refs, value="정산검증 참조")
     c.fill = FILL_HEADER_REF; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
@@ -380,6 +415,7 @@ def generate_mobis_report(verification: dict) -> bytes:
     ]
     headers2 += [f"G_{h}" for h in cost_headers]
     headers2 += [f"M_{h}" for h in cost_headers]
+    headers2 += _EXPECTED_LABELS
     headers2 += _REF_LABELS
     headers2 += _ROUTE_LABELS
 
@@ -388,6 +424,7 @@ def generate_mobis_report(verification: dict) -> bytes:
         [FILL_HEADER_MAIN] * 9
         + [FILL_HEADER_GROVE] * nc
         + [FILL_HEADER_MOBIS] * nc
+        + [FILL_HEADER_EXPECTED] * 4
         + [FILL_HEADER_REF] * 5
         + [FILL_HEADER_ROUTE] * 5
     )
@@ -421,6 +458,14 @@ def generate_mobis_report(verification: dict) -> bytes:
         # MOBIS 세부
         for h in cost_headers:
             row_data.append(md.get(h, 0.0) if is_err else "")
+        # 정산 예상금액
+        exp = r.get("expected") or {}
+        for f in _EXPECTED_FIELDS:
+            val = exp.get(f)
+            if val is None or val == "" or val == "존재X":
+                row_data.append(val if val == "존재X" else "")
+            else:
+                row_data.append(_safe_float(val))
         # 정산검증 참조
         row_data += [rf.get(f, "") for f in _REF_FIELDS]
         # 구간
@@ -456,13 +501,28 @@ def generate_mobis_report(verification: dict) -> bytes:
                     cell_g.fill = FILL_YELLOW
                     cell_m.fill = FILL_YELLOW
 
+        # 정산 예상금액 포맷 + 노란 음영
+        ed = r.get("expected_diffs") or {}
+        for i, f in enumerate(_EXPECTED_FIELDS):
+            exp_ci = 10 + nc * 2 + i  # GROVE(nc) + MOBIS(nc) 이후
+            cell_e = ws.cell(row=excel_row, column=exp_ci)
+            val = (r.get("expected") or {}).get(f)
+            if val is not None and val != "" and val != "존재X":
+                cell_e.number_format = money_fmt
+            if ed.get(f, False):
+                cell_e.fill = FILL_YELLOW
+
     # ── 열 너비 ─────────────────────────────────────────────
     base_widths = [5, 18, 18, 8, 24, 24, 16, 16, 16]
     for i, w in enumerate(base_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
     for i in range(nc * 2):
         ws.column_dimensions[get_column_letter(10 + i)].width = 14
-    ref_start = 10 + nc * 2
+    # 정산 예상금액 (4열)
+    exp_start = 10 + nc * 2
+    for i in range(4):
+        ws.column_dimensions[get_column_letter(exp_start + i)].width = 14
+    ref_start = exp_start + 4
     for i in range(5):
         ws.column_dimensions[get_column_letter(ref_start + i)].width = 16
     route_start = ref_start + 5

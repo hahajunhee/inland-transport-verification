@@ -84,6 +84,7 @@
             <th rowspan="2">MOBIS 산출<br>합계</th>
             <th colspan="5" class="th-grove">GROVE 전송 세부</th>
             <th colspan="5" class="th-mobis">MOBIS 산출 세부</th>
+            <th colspan="4" class="th-expected">정산 예상금액</th>
             <th colspan="5" class="th-ref">정산검증 참조</th>
             <th colspan="5" class="th-route">구간 (MOBIS 산출)</th>
           </tr>
@@ -99,6 +100,10 @@
             <th class="th-mobis">상하차료</th>
             <th class="th-mobis">셔틀료</th>
             <th class="th-mobis">대기료</th>
+            <th class="th-expected">TRKV<br>예상금액</th>
+            <th class="th-expected">보관료<br>예상금액</th>
+            <th class="th-expected">상하차료<br>예상금액</th>
+            <th class="th-expected">셔틀료<br>예상금액</th>
             <th class="th-ref">픽업지명</th>
             <th class="th-ref">출하지명</th>
             <th class="th-ref">ODCY코드</th>
@@ -112,7 +117,7 @@
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="29" class="empty-msg">파일을 업로드하세요.</td></tr>
+          <tr><td colspan="33" class="empty-msg">파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>
@@ -168,6 +173,7 @@
 .th-mobis { background: #ccfbf1 !important; color: #0f766e; }
 .th-ref   { background: #fef3c7 !important; color: #92400e; }
 .th-route { background: #f3e8ff !important; color: #6b21a8; }
+.th-expected { background: #dcfce7 !important; color: #15803d; }
 
 /* 행 상태 */
 .row-error td { background: #fff0f0 !important; }
@@ -211,6 +217,7 @@ const API_BASE = '/api/mobis';
 const COST_KEYS = ['내륙운임', '보관료', '상하차료', '셔틀료', '대기료'];
 const REF_KEYS = ['pickup_name', 'departure_name', 'odcy_code', 'dest_port_type', 'odcy_destination_name'];
 const ROUTE_KEYS = ['출발지', '작업지', '경유지', '도착지', 'ODCY도착지'];
+const EXPECTED_KEYS = ['trkv_expected', 'storage_expected', 'handling_expected', 'shuttle_expected'];
 let currentFile = null;
 let allResults = [];
 let lastVerification = null;
@@ -320,7 +327,7 @@ function renderTable() {
   }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="29" class="empty-msg">${currentFilter === 'ERROR' ? '오류 건이 없습니다.' : '결과가 없습니다.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="33" class="empty-msg">${currentFilter === 'ERROR' ? '오류 건이 없습니다.' : '결과가 없습니다.'}</td></tr>`;
     document.getElementById('result-count').textContent = '';
     return;
   }
@@ -362,6 +369,21 @@ function renderTable() {
         html += `<td class="${cls}">${fmt(md[k] || 0)}</td>`;
       } else {
         html += `<td class="detail-empty">-</td>`;
+      }
+    });
+
+    // 정산 예상금액 4열
+    const exp = r.expected || {};
+    const ed = r.expected_diffs || {};
+    EXPECTED_KEYS.forEach(k => {
+      const v = exp[k];
+      if (v === '존재X') {
+        html += `<td class="ref-missing">${v}</td>`;
+      } else if (v === '' || v === null || v === undefined) {
+        html += `<td class="detail-empty">-</td>`;
+      } else {
+        const cls = ed[k] ? 'cell-diff-yellow' : '';
+        html += `<td class="${cls}">${fmt(v)}</td>`;
       }
     });
 
