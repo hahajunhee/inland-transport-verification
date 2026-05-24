@@ -173,7 +173,9 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
 def run_mobis_verification(filename: str, parsed: dict) -> dict:
     """
     모비스 검증 실행.
-    오류 조건: GROVE ODCY 전송 행이 존재하면 무조건 오류.
+    오류 조건:
+      1) GROVE 전송 합계 ≠ MOBIS 산출 합계
+      2) GROVE ODCY 전송 행이 존재
     """
     rows = parsed["rows"]
     cost_headers = parsed["cost_headers"]
@@ -219,11 +221,15 @@ def run_mobis_verification(filename: str, parsed: dict) -> dict:
         grove_sum = cat_sums.get(CAT_GROVE) if cat_sums.get(CAT_GROVE) is not None else 0.0
         mobis_sum = cat_sums.get(CAT_MOBIS) if cat_sums.get(CAT_MOBIS) is not None else 0.0
 
-        # ── 오류 판정: GROVE ODCY 전송 행이 존재하면 무조건 오류 ──
-        is_error = has_grove_odcy
+        # ── 오류 판정 ──
+        # 1) GROVE 전송 합계 ≠ MOBIS 산출 합계
+        # 2) GROVE ODCY 전송 행이 존재
         error_reasons = []
+        if abs(grove_sum - mobis_sum) >= 1:
+            error_reasons.append(f"GROVE 전송({grove_sum:,.0f}) ≠ MOBIS 산출({mobis_sum:,.0f})")
         if has_grove_odcy:
             error_reasons.append("GROVE ODCY 전송 존재")
+        is_error = len(error_reasons) > 0
 
         if is_error:
             error_count += 1
