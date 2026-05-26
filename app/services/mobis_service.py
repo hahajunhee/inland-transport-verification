@@ -12,6 +12,10 @@ from openpyxl.utils import get_column_letter
 # ─── 열제목 매핑 ────────────────────────────────────────────────────────
 _REQUIRED_HEADERS = ["컨테이너 번호", "C/INV\n번호", "구분"]
 _COST_HEADERS = ["내륙운임", "보관료", "상하차료", "셔틀료", "대기료"]
+# 엑셀 원본에 오타가 있을 수 있으므로 별칭 매핑 (예: "상하자료" → "상하차료")
+_HEADER_ALIASES = {
+    "상하자료": "상하차료",
+}
 _EXTRA_HEADERS = ["적요", "출발지", "작업지", "경유지"]
 
 # 구분 카테고리
@@ -73,13 +77,23 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
                 dest_cols.append(ci)
                 break
 
+    # 별칭 → 정규 헤더 역매핑 (norm 기준)
+    alias_to_header = {_norm(k): v for k, v in _HEADER_ALIASES.items()}
+
     # Pass 1: 정확 매칭 — 모든 발견 위치 수집
+    # 별칭도 함께 검색 (예: "상하자료" → "상하차료")
     exact_matches: dict[str, list[int]] = {}
     for ci, candidates in enumerate(col_candidates):
         for header in ALL_HEADERS:
             norm_header = _norm(header)
             for val in candidates:
-                if _norm(val) == norm_header:
+                nv = _norm(val)
+                # 직접 매칭
+                if nv == norm_header:
+                    exact_matches.setdefault(header, []).append(ci)
+                    break
+                # 별칭 매칭: 엑셀 값이 별칭이고, 그 별칭의 정규 헤더가 현재 header이면
+                if alias_to_header.get(nv) == header:
                     exact_matches.setdefault(header, []).append(ci)
                     break
 
@@ -216,31 +230,9 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
             "row_number": ri + 1,
         })
 
-    # 비용 컬럼 디버그 정보
-    from openpyxl.utils import get_column_letter
-    debug_cost_cols = {}
-    for h in _COST_HEADERS:
-        info_parts = []
-        if h in col_map:
-            ci = col_map[h]
-            # 선택된 컬럼
-            info_parts.append(f"선택={get_column_letter(ci + 1)}(col{ci})")
-            # 첫 데이터행 원시값
-            if data_start < len(df):
-                raw = df.iloc[data_start, ci]
-                info_parts.append(f"raw={repr(raw)}")
-        else:
-            info_parts.append("미발견")
-        # 모든 후보 컬럼
-        all_cols = [get_column_letter(c + 1) for c in cost_exact.get(h, [])]
-        if all_cols:
-            info_parts.append(f"후보={all_cols}")
-        debug_cost_cols[h] = " / ".join(info_parts)
-
     return {
         "rows": rows,
         "cost_headers": found_costs,
-        "debug_cost_cols": debug_cost_cols,
     }
 
 
@@ -417,7 +409,6 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
         "ok_count": ok_count,
         "cost_headers": cost_headers,
         "results": results,
-        "debug_cost_cols": parsed.get("debug_cost_cols") if isinstance(parsed, dict) else None,
     }
 
 

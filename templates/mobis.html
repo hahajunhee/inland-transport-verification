@@ -55,7 +55,6 @@
         <div class="summary-value" id="s-error">-</div>
       </div>
     </div>
-    <div id="debug-cost-cols" style="display:none; margin-top:8px; font-size:11px; color:#666; background:#f9fafb; padding:6px 10px; border-radius:4px; font-family:monospace;"></div>
   </div>
 
   <!-- 결과 테이블 -->
@@ -317,16 +316,6 @@ function showResults(data) {
   document.getElementById('s-total').textContent = data.total_groups;
   document.getElementById('s-ok').textContent = data.ok_count;
   document.getElementById('s-error').textContent = data.error_count;
-
-  // 비용 컬럼 매칭 디버그 표시
-  const debugDiv = document.getElementById('debug-cost-cols');
-  if (data.debug_cost_cols && debugDiv) {
-    const items = Object.entries(data.debug_cost_cols)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join(' | ');
-    debugDiv.textContent = `감지된 비용 컬럼 → ${items}`;
-    debugDiv.style.display = '';
-  }
 
   renderTable();
 }
