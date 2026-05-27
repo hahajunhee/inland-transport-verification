@@ -230,7 +230,8 @@ function renderResults(sorted) {
 
 function renderRow(r) {
   const rowClass = r.overall_status === "DIFF" ? "row-diff"
-                 : r.overall_status === "NO_RATE" ? "row-no-rate" : "";
+                 : r.overall_status === "NO_RATE" ? "row-no-rate"
+                 : r.overall_status === "SKIP" ? "row-skip" : "";
 
   const pickupPort = r.pickup_port_resolved
     ? `<span class="port-resolved">${r.pickup_port_resolved}</span>`

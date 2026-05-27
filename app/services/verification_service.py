@@ -447,23 +447,30 @@ def _run_verification_core(filename: str, rows: list) -> dict:
                 result["storage_unit_rate"] = unit_rate
 
             prefix = prefix_map[charge_type]
-            if status in ("OK", "SKIP"):
+            if status == "OK":
                 session[f"{prefix}_pass"] += 1
             elif status == "DIFF":
                 session[f"{prefix}_fail"] += 1
                 total_diff += abs(diff or 0)
             elif status == "NO_RATE":
                 session[f"{prefix}_no_rate"] += 1
+            elif status == "SKIP":
+                # SKIP은 오류 상태 (단가도 없고 청구도 0원 → 데이터 결측 가능성)
+                session[f"{prefix}_skip"] = session.get(f"{prefix}_skip", 0) + 1
 
         result["storage_rate_row"] = storage_rate_row
 
-        # 종합 상태
-        if all(s in ("OK", "SKIP") for s in statuses):
+        # 종합 상태 — SKIP은 오류로 분류
+        if all(s == "OK" for s in statuses):
             overall = "OK"
+        elif "DIFF" in statuses:
+            overall = "DIFF"
+        elif "SKIP" in statuses:
+            overall = "SKIP"
         elif "NO_RATE" in statuses:
             overall = "NO_RATE"
         else:
-            overall = "DIFF"
+            overall = "OK"
 
         result["overall_status"] = overall
         results.append(result)

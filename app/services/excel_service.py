@@ -174,7 +174,7 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
 FILL_OK      = PatternFill("solid", fgColor="FFFFFF")  # OK: 흰색 (웹과 동일)
 FILL_DIFF    = PatternFill("solid", fgColor="FFF5F5")  # DIFF: #fff5f5
 FILL_NO_RATE = PatternFill("solid", fgColor="FFFEF0")  # NO_RATE: #fffef0
-FILL_SKIP    = PatternFill("solid", fgColor="F2F2F2")  # SKIP: 회색
+FILL_SKIP    = PatternFill("solid", fgColor="FAF5FF")  # SKIP: 보라색 (오류 상태)
 
 STATUS_FILL = {
     "OK":      FILL_OK,

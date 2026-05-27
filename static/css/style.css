@@ -183,9 +183,10 @@ a:hover { text-decoration: underline; }
 .status-ok { background: #e6f4ea !important; color: #1e7e34; font-weight: 700; }
 .status-diff { background: #fce8e6 !important; color: #c62828; font-weight: 700; }
 .status-no-rate { background: #fff9e6 !important; color: #856404; font-weight: 700; }
-.status-skip { color: #aaa; }
+.status-skip { background: #f3e8ff !important; color: #6b21a8; font-weight: 700; }
 .row-diff td { background: #fff5f5; }
 .row-no-rate td { background: #fffef0; }
+.row-skip td { background: #faf5ff; }
 
 /* ─── 결과 테이블 그룹 헤더 ─────────────────────────────── */
 .th-group    { font-size: 12px; letter-spacing: -.2px; font-weight: 700; }
