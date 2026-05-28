@@ -4,7 +4,7 @@ let currentSessionId = null;
 let currentFilter = "ALL";
 let allRows = [];          // 현재 세션+필터의 전체 결과
 let sortState = { col: "row_number", dir: "asc" };
-const EMPTY_COLS = 48;     // colspan for empty message
+const EMPTY_COLS = 53;     // colspan for empty message (기본5+구간12+TRKV5+구분11+보관6+상하4+셔틀4+대기5+종합1 = 53)
 
 document.addEventListener("DOMContentLoaded", () => {
   setupDropZone();
@@ -304,9 +304,40 @@ function renderRow(r) {
     ${chargeCell(r.handling_actual, r.handling_expected, r.handling_diff, r.handling_status, 'cg-h')}
     <!-- 셔틀비용 -->
     ${chargeCell(r.shuttle_actual, r.shuttle_expected, r.shuttle_diff, r.shuttle_status, 'cg-sh')}
+    <!-- 직반입대기료 (5열: Waiting / 청구 / 예상 / 차이 / 상태) -->
+    ${waitingCells(r)}
     <!-- 종합 -->
     <td class="${statusClass(r.overall_status)}">${r.overall_status || "-"}</td>
   </tr>`;
+}
+
+// ─── 직반입대기료 5열 렌더 ────────────────────────────────
+// waiting (odcy) == "X" 일 때만 청구/예상/차이/상태 표시.
+// X 미표시이면 검증 대상 아님 → 청구금액만 보여주고 나머지는 "-".
+function waitingCells(r) {
+  const flag = (r.waiting_odcy_flag || "").toUpperCase();
+  const flagCell = flag === "X"
+    ? `<td class="td-center cg-w"><span class="wait-x-badge">X</span></td>`
+    : `<td class="td-center cg-w" style="color:#9ca3af">-</td>`;
+
+  if (flag === "X") {
+    // 검증 활성
+    const sc = statusClass(r.waiting_status);
+    const diff = r.waiting_diff;
+    const diffStr = diff != null ? (diff >= 0 ? "+" : "") + fmtMoney(diff) : "-";
+    const diffColor = diff > 0.5 ? 'style="color:#c62828"' : diff < -0.5 ? 'style="color:#1a73e8"' : "";
+    return `${flagCell}
+      <td class="money cg-w">${fmtMoney(r.waiting_actual)}</td>
+      <td class="money cg-w">${r.waiting_expected != null ? fmtMoney(r.waiting_expected) : "-"}</td>
+      <td class="money cg-w" ${diffColor}>${diffStr}</td>
+      <td class="${sc} cg-w">${r.waiting_status || "-"}</td>`;
+  }
+  // 검증 대상 아님 — 청구금액만 표시
+  return `${flagCell}
+    <td class="money cg-w">${fmtMoney(r.waiting_actual || 0)}</td>
+    <td class="money cg-w" style="color:#9ca3af">-</td>
+    <td class="money cg-w" style="color:#9ca3af">-</td>
+    <td class="cg-w" style="color:#9ca3af">-</td>`;
 }
 
 function chargeCell(actual, expected, diff, status, cg) {
@@ -348,7 +379,7 @@ function showError(msg) {
 
 // ─── 접기/펼치기 그룹 ─────────────────────────────────────
 const groupColspans = {
-  route: 12, trkv: 5, info: 11, storage: 6, handling: 4, shuttle: 4,
+  route: 12, trkv: 5, info: 11, storage: 6, handling: 4, shuttle: 4, waiting: 5,
 };
 const hiddenGroups = new Set();
 

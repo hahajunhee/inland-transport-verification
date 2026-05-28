@@ -121,6 +121,7 @@
             <th colspan="6" class="th-group th-storage collapsible-group" data-group="storage" onclick="toggleGroup('storage')"><span class="group-toggle">▾</span> 보관료</th>
             <th colspan="4" class="th-group th-handling collapsible-group" data-group="handling" onclick="toggleGroup('handling')"><span class="group-toggle">▾</span> 상하차료</th>
             <th colspan="4" class="th-group th-shuttle collapsible-group" data-group="shuttle" onclick="toggleGroup('shuttle')"><span class="group-toggle">▾</span> 셔틀비용</th>
+            <th colspan="5" class="th-group th-waiting collapsible-group" data-group="waiting" onclick="toggleGroup('waiting')"><span class="group-toggle">▾</span> 직반입대기료</th>
             <th rowspan="3" class="sortable-th" onclick="sortBy('overall_status')">종합 <span class="sort-arrow">↕</span></th>
           </tr>
           <!-- 2행: 세부 헤더 -->
@@ -167,6 +168,12 @@
             <!-- 셔틀비용 4열 -->
             <th class="th-shuttle cg-sh">청구</th><th class="th-shuttle cg-sh">예상</th><th class="th-shuttle cg-sh">차이</th>
             <th class="th-shuttle cg-sh sortable-th" onclick="sortBy('shuttle_status')">상태 <span class="sort-arrow">↕</span></th>
+            <!-- 직반입대기료 5열 -->
+            <th class="th-waiting cg-w sortable-th" onclick="sortBy('waiting_odcy_flag')">Waiting<br>(ODCY) <span class="sort-arrow">↕</span></th>
+            <th class="th-waiting cg-w">청구</th>
+            <th class="th-waiting cg-w">예상 <span class="help-tip" title="waiting (odcy) 가 'X' 표시일 때 120,000 × Quantity 로 계산됩니다.">❓</span></th>
+            <th class="th-waiting cg-w">차이</th>
+            <th class="th-waiting cg-w sortable-th" onclick="sortBy('waiting_status')">상태 <span class="sort-arrow">↕</span></th>
           </tr>
           <!-- 3행: 출처 정보 -->
           <tr class="th-source-row">
@@ -218,10 +225,16 @@
             <th class="th-source th-shuttle cg-sh">계산</th>
             <th class="th-source th-shuttle cg-sh">계산</th>
             <th class="th-source th-shuttle cg-sh">계산</th>
+            <!-- 직반입대기료 5열 -->
+            <th class="th-source th-waiting cg-w">검증: waiting (odcy)</th>
+            <th class="th-source th-waiting cg-w">검증: ODCY 직반입대기료</th>
+            <th class="th-source th-waiting cg-w">계산(=120,000×Qty)</th>
+            <th class="th-source th-waiting cg-w">계산</th>
+            <th class="th-source th-waiting cg-w">계산</th>
           </tr>
         </thead>
         <tbody id="results-tbody">
-          <tr><td colspan="48" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
+          <tr><td colspan="53" class="empty-msg">세션을 선택하거나 파일을 업로드하세요.</td></tr>
         </tbody>
       </table>
     </div>
@@ -258,6 +271,7 @@
 .result-table.hide-storage .cg-s { display: none; }
 .result-table.hide-handling .cg-h { display: none; }
 .result-table.hide-shuttle .cg-sh { display: none; }
+.result-table.hide-waiting .cg-w { display: none; }
 
 .result-table.hide-route [data-group="route"] { writing-mode: vertical-lr; white-space: nowrap; }
 .result-table.hide-trkv [data-group="trkv"] { writing-mode: vertical-lr; white-space: nowrap; }
@@ -265,6 +279,12 @@
 .result-table.hide-storage [data-group="storage"] { writing-mode: vertical-lr; white-space: nowrap; }
 .result-table.hide-handling [data-group="handling"] { writing-mode: vertical-lr; white-space: nowrap; }
 .result-table.hide-shuttle [data-group="shuttle"] { writing-mode: vertical-lr; white-space: nowrap; }
+.result-table.hide-waiting [data-group="waiting"] { writing-mode: vertical-lr; white-space: nowrap; }
+
+/* 직반입대기료 그룹 색상 */
+.th-waiting { background: #fef3c7 !important; color: #b45309 !important; }
+.wait-x-badge { display:inline-block; padding:1px 7px; border-radius:10px;
+                background:#b45309; color:#fff; font-weight:700; font-size:12px; }
 
 /* ─── 요율 참조행 배지 ─── */
 .ref-badge { display:inline-block; padding:1px 6px; border-radius:8px; font-size:11px; font-weight:700; }
@@ -312,5 +332,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/verification.js?v=20260506b"></script>
+<script src="/static/js/verification.js?v=20260528a"></script>
 {% endblock %}

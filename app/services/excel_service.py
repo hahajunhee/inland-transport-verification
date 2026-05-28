@@ -33,6 +33,10 @@ COLUMN_MAP = {
     "ODCY 반입일":            "odcy_in_date",
     "ODCY 반출일":            "odcy_out_date",
     "OM-D":                   "om_d",
+    # ── 직반입대기료 검증 ───
+    # waiting (odcy) 컬럼에 "X" 가 있으면 ODCY 직반입대기료가 (120,000 × Quantity) 인지 검증
+    "waiting (odcy)":         "waiting_odcy_flag",
+    "ODCY 직반입대기료":      "waiting_actual",
 }
 
 
@@ -130,8 +134,12 @@ def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
             continue
 
         # 금액 파싱
-        for field in ("trkv_actual", "storage_actual", "handling_actual", "shuttle_actual"):
+        for field in ("trkv_actual", "storage_actual", "handling_actual", "shuttle_actual", "waiting_actual"):
             row[field] = _safe_float(row.get(field))
+
+        # 직반입대기료: waiting (odcy) 플래그 — "X" 여부만 의미 (대소문자 무시)
+        wo = str(row.get("waiting_odcy_flag") or "").strip().upper()
+        row["waiting_odcy_flag"] = "X" if wo == "X" else ""
 
         # 수량 파싱 (없으면 1.0 기본값)
         qty = _safe_float(row.get("quantity"))
@@ -195,7 +203,9 @@ _SECTIONS = [
     (38,  43, "보관료",         "1E7E34", "E6F9F0", "1E7E34"),
     (44,  47, "상하차료",       "D96C00", "FEF3E8", "D96C00"),
     (48,  51, "셔틀비용",       "7B1FA2", "F3E8FE", "7B1FA2"),
-    (52,  52, "종합",           "374151", "E5E7EB", "374151"),
+    # 직반입대기료: Waiting(X 표시) + 청구 + 예상 + 차이 + 상태  (waiting(odcy)=X 일 때 120,000×Qty 검증)
+    (52,  56, "직반입대기료",   "B45309", "FEF3C7", "B45309"),
+    (57,  57, "종합",           "374151", "E5E7EB", "374151"),
 ]
 
 def _col_style(col_idx: int):
@@ -227,7 +237,9 @@ SECONDARY_HEADERS = [
     "상하차료청구금액", "상하차료예상금액", "상하차료차이금액", "상하차료상태",
     # 셔틀비용 (48-51)
     "셔틀료청구금액", "셔틀료예상금액", "셔틀료차이금액", "셔틀료상태",
-    # 종합 (52)
+    # 직반입대기료 (52-56)
+    "Waiting(ODCY)", "직반입대기료청구금액", "직반입대기료예상금액", "직반입대기료차이금액", "직반입대기료상태",
+    # 종합 (57)
     "종합상태",
 ]
 
@@ -252,7 +264,9 @@ SECONDARY_SOURCES = [
     "검증: ODCY 상하차료", "계산", "계산", "계산",
     # 셔틀비용 (48-51)
     "검증: ODCY 셔틀료", "계산", "계산", "계산",
-    # 종합 (52)
+    # 직반입대기료 (52-56)
+    "검증: waiting (odcy)", "검증: ODCY 직반입대기료", "계산(=120,000×Qty)", "계산", "계산",
+    # 종합 (57)
     "계산",
 ]
 
@@ -283,6 +297,8 @@ def secondary_row_to_list(r: dict | None) -> list:
         g("storage_tier_number"), g("storage_unit_rate"), g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
         g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),
         g("shuttle_actual"), g("shuttle_expected"), g("shuttle_diff"), g("shuttle_status"),
+        # 직반입대기료 (52-56)
+        g("waiting_odcy_flag"), g("waiting_actual"), g("waiting_expected"), g("waiting_diff"), g("waiting_status"),
         g("overall_status"),
     ]
 

@@ -11,6 +11,9 @@ from app.services.storage_rate_service import find_storage_rate
 
 TOLERANCE = 1.0  # 원 단위 허용 오차
 
+# 직반입대기료 고정 단가 (waiting (odcy) == "X" 일 때만 적용)
+WAITING_UNIT_RATE = 120000.0
+
 # OM-D 코드 → 도착포트 매핑
 BUSN_SINPORT_OMD = {"KRPUSN", "PUSN16", "PUSN7"}
 
@@ -459,6 +462,27 @@ def _run_verification_core(filename: str, rows: list) -> dict:
                 session[f"{prefix}_skip"] = session.get(f"{prefix}_skip", 0) + 1
 
         result["storage_rate_row"] = storage_rate_row
+
+        # ─── 직반입대기료 검증 (waiting (odcy) == "X" 일 때만) ──────────
+        # X 표시: expected = 120,000 × Quantity, OK/DIFF 판정 — overall_status 에 반영
+        # X 미표시: 검증 대상 아님. status=""(빈 상태) → overall_status 에 영향 없음
+        waiting_flag = str(row.get("waiting_odcy_flag") or "").strip().upper()
+        waiting_actual_val = float(row.get("waiting_actual") or 0.0)
+        if waiting_flag == "X":
+            waiting_expected = WAITING_UNIT_RATE * quantity
+            waiting_diff = waiting_expected - waiting_actual_val
+            waiting_status = "OK" if abs(waiting_diff) < TOLERANCE else "DIFF"
+            statuses.append(waiting_status)
+        else:
+            waiting_expected = None
+            waiting_diff = None
+            waiting_status = ""  # 빈 상태(검증 대상 아님). overall_status 미반영
+
+        result["waiting_odcy_flag"] = waiting_flag  # "X" 또는 ""
+        result["waiting_actual"] = waiting_actual_val
+        result["waiting_expected"] = waiting_expected
+        result["waiting_diff"] = waiting_diff
+        result["waiting_status"] = waiting_status
 
         # 종합 상태 — SKIP은 오류로 분류
         if all(s == "OK" for s in statuses):
