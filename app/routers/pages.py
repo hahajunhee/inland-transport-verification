@@ -2,10 +2,12 @@ from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 import os
 
-from app import data_store
+from app import data_store, __version__ as APP_VERSION
 
 router = APIRouter()
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates"))
+# 모든 페이지에서 {{ version }} 으로 앱 버전 사용 가능 (base.html 의 <title>/favicon 옆에 표시)
+templates.env.globals["version"] = APP_VERSION
 
 
 @router.get("/")
