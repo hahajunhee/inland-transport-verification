@@ -206,34 +206,93 @@ def _col_style(col_idx: int):
     return "FFFFFF", "000000"
 
 
+# ─── 2단계 검증결과 헤더/소스 (외부 재사용용) ─────────────────
+SECONDARY_HEADERS = [
+    # 기본 정보 (1-5)
+    "행번호", "컨테이너번호", "FWO Doc.", "C/Invoice No.", "운송일자",
+    # 운송 구간 정보 (6-21)
+    "픽업지코드", "픽업지명", "픽업포트(매핑)",
+    "출하지명", "출하코드(매핑)",
+    "ODCY코드", "ODCY(상세ODCY명)",
+    "도착지코드", "ODCY도착지명", "도착포트(매핑)",
+    "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호", "TRKV요율#",
+    # TRKV (22-26)
+    "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
+    # 구분값 정보 (27-37)
+    "ODCY도착지명", "도착지명(원본)", "odcy터미널구분", "ODCY_위치", "도착지포트구분", "도착지터미널구분",
+    "ODCY반입일", "ODCY반출일", "보관일수", "FREE반영", "보관요율#",
+    # 보관료 (38-43)
+    "보관료티어", "보관단가(일)", "보관료청구금액", "보관료예상금액", "보관료차이금액", "보관료상태",
+    # 상하차료 (44-47)
+    "상하차료청구금액", "상하차료예상금액", "상하차료차이금액", "상하차료상태",
+    # 셔틀비용 (48-51)
+    "셔틀료청구금액", "셔틀료예상금액", "셔틀료차이금액", "셔틀료상태",
+    # 종합 (52)
+    "종합상태",
+]
+
+SECONDARY_SOURCES = [
+    # 기본 정보 (1-5)
+    "생성", "검증: Contrainer No.", "검증: FWO Doc.", "검증: C/Invoice No.", "검증: 출하일",
+    # 운송 구간 정보 (6-21)
+    "검증: 픽업지", "검증: 픽업지명", "요율표: PM-A",
+    "검증: 출하지명", "요율표: DM-A",
+    "검증: 상세ODCY", "검증: 상세ODCY명",
+    "검증: 도착지", "요율표: OM-A→OM-D", "OM-D 값을 통해 변환",
+    "검증: Cont.Category", "검증: D/G여부", "검증: Quantity", "검증: Weekend/Holiday", "요율표: 컨테이너티어", "요율표: TRKV구간",
+    # TRKV (22-26)
+    "요율표: TRKV구간", "검증: Mobis운임합계", "계산", "계산", "계산",
+    # 구분값 정보 (27-37)
+    "검증: ODCY도착지명", "검증: 도착지명",
+    "요율표: OM-C", "요율표: OM-D", "요율표: PM-B", "요율표: PM-C",
+    "검증: ODCY 반입일", "검증: ODCY 반출일", "계산", "계산", "요율표: OM-A+5키 매칭",
+    # 보관료 (38-43)
+    "요율표: OM-A+5키 매칭", "요율표: OM-A+5키 매칭", "검증: ODCY 보관료", "계산", "계산", "계산",
+    # 상하차료 (44-47)
+    "검증: ODCY 상하차료", "계산", "계산", "계산",
+    # 셔틀비용 (48-51)
+    "검증: ODCY 셔틀료", "계산", "계산", "계산",
+    # 종합 (52)
+    "계산",
+]
+
+# 외부에서 섹션 그룹 헤더 구성에 사용
+SECONDARY_SECTIONS = _SECTIONS
+
+
+def secondary_row_to_list(r: dict | None) -> list:
+    """2단계 검증결과 1행을 SECONDARY_HEADERS 순서의 셀 값 리스트로 변환.
+    r이 None이면 빈 셀 52개 반환 (모비스 행이 매칭 안된 경우).
+    """
+    if not r:
+        return [""] * len(SECONDARY_HEADERS)
+    g = (lambda k: r.get(k) if isinstance(r, dict) else getattr(r, k, None))
+    return [
+        g("row_number"), g("container_no"), g("fwo_doc"), g("c_invoice_no"), g("transport_date"),
+        g("pickup_code"), g("pickup_name"), g("pickup_port_resolved"),
+        g("departure_name"), g("departure_code_resolved"),
+        g("odcy_code"), g("odcy_name"),
+        g("dest_code"), g("dest_name"), g("dest_port_resolved"),
+        g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"), g("weekend_holiday") or "", g("tier_number"), g("trkv_rate_row"),
+        g("trkv_unit_rate"), g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
+        # 구분값 정보
+        g("odcy_destination_name"), g("dest_name_original"),
+        g("odcy_terminal_type"), g("odcy_location"), g("dest_port_type"), g("dest_terminal_type"),
+        g("odcy_in_date"), g("odcy_out_date"), g("storage_days"), g("billable_days"), g("storage_rate_row"),
+        # 보관료
+        g("storage_tier_number"), g("storage_unit_rate"), g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
+        g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),
+        g("shuttle_actual"), g("shuttle_expected"), g("shuttle_diff"), g("shuttle_status"),
+        g("overall_status"),
+    ]
+
+
 def generate_results_excel(results: list) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "정산검증결과"
 
-    headers = [
-        # 기본 정보 (1-5)
-        "행번호", "컨테이너번호", "FWO Doc.", "C/Invoice No.", "운송일자",
-        # 운송 구간 정보 (6-21)
-        "픽업지코드", "픽업지명", "픽업포트(매핑)",
-        "출하지명", "출하코드(매핑)",
-        "ODCY코드", "ODCY(상세ODCY명)",
-        "도착지코드", "ODCY도착지명", "도착포트(매핑)",
-        "컨테이너유형", "위험물", "수량", "주말/휴일", "티어번호", "TRKV요율#",
-        # TRKV (22-26)
-        "TRKV단가", "TRKV청구금액", "TRKV예상금액", "TRKV차이금액", "TRKV상태",
-        # 구분값 정보 (27-37)
-        "ODCY도착지명", "도착지명(원본)", "odcy터미널구분", "ODCY_위치", "도착지포트구분", "도착지터미널구분",
-        "ODCY반입일", "ODCY반출일", "보관일수", "FREE반영", "보관요율#",
-        # 보관료 (38-43)
-        "보관료티어", "보관단가(일)", "보관료청구금액", "보관료예상금액", "보관료차이금액", "보관료상태",
-        # 상하차료 (44-47)
-        "상하차료청구금액", "상하차료예상금액", "상하차료차이금액", "상하차료상태",
-        # 셔틀비용 (48-51)
-        "셔틀료청구금액", "셔틀료예상금액", "셔틀료차이금액", "셔틀료상태",
-        # 종합 (52)
-        "종합상태",
-    ]
+    headers = SECONDARY_HEADERS
     total_cols = len(headers)
 
     # ── Row 1: 섹션 그룹 헤더 (병합 + 진한 배경) ──────────────────
@@ -258,31 +317,7 @@ def generate_results_excel(results: list) -> bytes:
     ws.row_dimensions[2].height = 28
 
     # ── Row 3: 출처 정보 행 ────────────────────────────────────────
-    sources = [
-        # 기본 정보 (1-5)
-        "생성", "검증: Contrainer No.", "검증: FWO Doc.", "검증: C/Invoice No.", "검증: 출하일",
-        # 운송 구간 정보 (6-21)
-        "검증: 픽업지", "검증: 픽업지명", "요율표: PM-A",
-        "검증: 출하지명", "요율표: DM-A",
-        "검증: 상세ODCY", "검증: 상세ODCY명",
-        "검증: 도착지", "요율표: OM-A→OM-D", "OM-D 값을 통해 변환",
-        "검증: Cont.Category", "검증: D/G여부", "검증: Quantity", "검증: Weekend/Holiday", "요율표: 컨테이너티어", "요율표: TRKV구간",
-        # TRKV (22-26)
-        "요율표: TRKV구간", "검증: Mobis운임합계", "계산", "계산", "계산",
-        # 구분값 정보 (27-37)
-        "검증: ODCY도착지명", "검증: 도착지명",
-        "요율표: OM-C", "요율표: OM-D", "요율표: PM-B", "요율표: PM-C",
-        "검증: ODCY 반입일", "검증: ODCY 반출일", "계산", "계산", "요율표: OM-A+5키 매칭",
-        # 보관료 (38-43)
-        "요율표: OM-A+5키 매칭", "요율표: OM-A+5키 매칭", "검증: ODCY 보관료", "계산", "계산", "계산",
-        # 상하차료 (44-47)
-        "검증: ODCY 상하차료", "계산", "계산", "계산",
-        # 셔틀비용 (48-51)
-        "검증: ODCY 셔틀료", "계산", "계산", "계산",
-        # 종합 (52)
-        "계산",
-    ]
-    ws.append(sources)
+    ws.append(SECONDARY_SOURCES)
     for col_idx, cell in enumerate(ws[3], 1):
         col_bg, col_font = _col_style(col_idx)
         cell.fill = PatternFill("solid", fgColor=col_bg)
@@ -294,24 +329,7 @@ def generate_results_excel(results: list) -> bytes:
 
     for r in results:
         g = (lambda k: r.get(k) if isinstance(r, dict) else getattr(r, k, None))
-        row_data = [
-            g("row_number"), g("container_no"), g("fwo_doc"), g("c_invoice_no"), g("transport_date"),
-            g("pickup_code"), g("pickup_name"), g("pickup_port_resolved"),
-            g("departure_name"), g("departure_code_resolved"),
-            g("odcy_code"), g("odcy_name"),
-            g("dest_code"), g("dest_name"), g("dest_port_resolved"),
-            g("container_type"), "Y" if g("dg_flag") else "N", g("quantity"), g("weekend_holiday") or "", g("tier_number"), g("trkv_rate_row"),
-            g("trkv_unit_rate"), g("trkv_actual"), g("trkv_expected"), g("trkv_diff"), g("trkv_status"),
-            # 구분값 정보
-            g("odcy_destination_name"), g("dest_name_original"),
-            g("odcy_terminal_type"), g("odcy_location"), g("dest_port_type"), g("dest_terminal_type"),
-            g("odcy_in_date"), g("odcy_out_date"), g("storage_days"), g("billable_days"), g("storage_rate_row"),
-            # 보관료
-            g("storage_tier_number"), g("storage_unit_rate"), g("storage_actual"), g("storage_expected"), g("storage_diff"), g("storage_status"),
-            g("handling_actual"), g("handling_expected"), g("handling_diff"), g("handling_status"),
-            g("shuttle_actual"), g("shuttle_expected"), g("shuttle_diff"), g("shuttle_status"),
-            g("overall_status"),
-        ]
+        row_data = secondary_row_to_list(r)
         ws.append(row_data)
         excel_row = ws.max_row
 

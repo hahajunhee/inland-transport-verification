@@ -250,7 +250,10 @@ _EXPECTED_TO_MOBIS = {
 
 
 def build_ref_lookup(session_id: int) -> dict:
-    """2단계 검증결과에서 (c_invoice_no, container_no) → 참조 데이터 dict 빌드."""
+    """2단계 검증결과에서 (c_invoice_no, container_no) → 참조 데이터 dict 빌드.
+    반환 dict 구조: { (c_inv, container_no): { ...REF/EXPECTED 필드..., "_full_row": <2단계 결과 행 전체> } }
+    _full_row 는 다운로드 시 우측 52컬럼 통째 전개에 사용.
+    """
     from app import data_store
     results = data_store.load_results(session_id)
     lookup = {}
@@ -264,6 +267,7 @@ def build_ref_lookup(session_id: int) -> dict:
             data = {f: (r.get(f) or "") for f in _REF_FIELDS}
             for f in _EXPECTED_FIELDS:
                 data[f] = r.get(f)
+            data["_full_row"] = r  # 2단계 검증결과 행 전체 (다운로드 우측 확장용)
             lookup[key] = data
     return lookup
 
@@ -355,6 +359,7 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
         # 정산검증 참조 (2단계 검증결과에서 키 매칭)
         ref = dict(_REF_EMPTY) if ref_lookup is not None else {f: "" for f in _REF_FIELDS}
         expected = dict(_EXPECTED_EMPTY) if ref_lookup is not None else {f: "" for f in _EXPECTED_FIELDS}
+        ref_full = None  # 2단계 검증결과 행 전체 (다운로드 우측 확장용)
         if ref_lookup is not None:
             ref_key = (c_inv_no, container_no)
             if ref_key in ref_lookup:
@@ -362,6 +367,7 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
                 ref = {f: ref_data.get(f, "") for f in _REF_FIELDS}
                 for f in _EXPECTED_FIELDS:
                     expected[f] = ref_data.get(f)
+                ref_full = ref_data.get("_full_row")
 
         # 세부 비교: GROVE 전송 vs MOBIS 산출 항목별 차이 (오류행용)
         detail_diffs = {}
@@ -399,6 +405,7 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
             "ref": ref,
             "expected": expected,
             "expected_diffs": expected_diffs,
+            "ref_full": ref_full,  # 2단계 검증결과 행 전체 (다운로드 우측 52컬럼용)
         }
         results.append(result)
 
@@ -413,7 +420,14 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
 
 
 def generate_mobis_report(verification: dict) -> bytes:
-    """모비스 검증 결과 엑셀 생성."""
+    """모비스 검증 결과 엑셀 생성.
+    ref_full(2단계 검증결과 행 전체)이 있는 행이 하나라도 있으면, 우측에
+    2단계 검증결과 다운로드와 동일한 52개 컬럼 + 섹션 그룹 헤더를 함께 출력.
+    """
+    from app.services.excel_service import (
+        SECONDARY_HEADERS, SECONDARY_SECTIONS, secondary_row_to_list,
+    )
+
     wb = Workbook()
     ws = wb.active
     ws.title = "모비스검증결과"
@@ -439,8 +453,13 @@ def generate_mobis_report(verification: dict) -> bytes:
     FILL_HEADER_EXPECTED = PatternFill("solid", fgColor="15803D")
     _EXPECTED_LABELS = ["TRKV예상금액", "보관료예상금액", "상하차료예상금액", "셔틀료예상금액"]
 
+    # 2단계 검증결과 우측 확장 여부 (결과 중 ref_full 보유 행이 하나라도 있으면 활성화)
+    results_list = verification.get("results") or []
+    has_secondary = any(r.get("ref_full") for r in results_list)
+    sec_count = len(SECONDARY_HEADERS) if has_secondary else 0  # 보통 52
+
     # ── Row 1: 그룹 헤더 (병합) ─────────────────────────────
-    total_cols = 9 + nc * 2 + 4 + 5 + 5  # 기본+GROVE+MOBIS+정산예상+정산참조+구간
+    total_cols = 9 + nc * 2 + 4 + 5 + 5 + sec_count  # 기본+GROVE+MOBIS+정산예상+정산참조+구간+2단계
     ws.append([""] * total_cols)
     # 기본 정보 (1~9)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
@@ -471,6 +490,21 @@ def generate_mobis_report(verification: dict) -> bytes:
     ws.merge_cells(start_row=1, start_column=rts, end_row=1, end_column=rte)
     c = ws.cell(row=1, column=rts, value="구간 (MOBIS 산출)")
     c.fill = FILL_HEADER_ROUTE; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
+
+    # ── 2단계 검증결과 섹션 그룹 헤더 (rte+1 부터) ─────────────
+    # SECONDARY_SECTIONS 는 1-based (1~52). rte 다음 컬럼이 1번 컬럼이 되도록 offset.
+    sec_offset = rte  # 시작 컬럼 = sec_offset + 1
+    if has_secondary:
+        for s_start, s_end, s_label, s_group_bg, _s_col_bg, _s_col_font in SECONDARY_SECTIONS:
+            abs_start = sec_offset + s_start
+            abs_end = sec_offset + s_end
+            cell = ws.cell(row=1, column=abs_start, value=f"[2단계] {s_label}")
+            cell.fill = PatternFill("solid", fgColor=s_group_bg)
+            cell.font = FONT_HEADER
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            if abs_end > abs_start:
+                ws.merge_cells(start_row=1, start_column=abs_start,
+                               end_row=1, end_column=abs_end)
     ws.row_dimensions[1].height = 22
 
     # ── Row 2: 개별 컬럼 헤더 ───────────────────────────────
@@ -484,8 +518,26 @@ def generate_mobis_report(verification: dict) -> bytes:
     headers2 += _EXPECTED_LABELS
     headers2 += _REF_LABELS
     headers2 += _ROUTE_LABELS
+    if has_secondary:
+        # 2단계 컬럼명에 prefix "[2단계] " 부여 — 동일 명칭(예: "도착지명") 중복 회피
+        headers2 += [f"[2단계] {h}" for h in SECONDARY_HEADERS]
 
     ws.append(headers2)
+    # 2단계 섹션별 컬럼 배경색 (excel_service._SECTIONS 의 col_bg/col_font 사용)
+    secondary_col_fills = []
+    secondary_col_fonts = []
+    if has_secondary:
+        for col_idx in range(1, len(SECONDARY_HEADERS) + 1):
+            col_bg = "FFFFFF"
+            col_font_color = "000000"
+            for s_start, s_end, _s_label, _gbg, s_col_bg, s_col_font in SECONDARY_SECTIONS:
+                if s_start <= col_idx <= s_end:
+                    col_bg = s_col_bg
+                    col_font_color = s_col_font
+                    break
+            secondary_col_fills.append(PatternFill("solid", fgColor=col_bg))
+            secondary_col_fonts.append(Font(bold=True, color=col_font_color, size=9))
+
     header_fills = (
         [FILL_HEADER_MAIN] * 9
         + [FILL_HEADER_GROVE] * nc
@@ -493,10 +545,15 @@ def generate_mobis_report(verification: dict) -> bytes:
         + [FILL_HEADER_EXPECTED] * 4
         + [FILL_HEADER_REF] * 5
         + [FILL_HEADER_ROUTE] * 5
+        + secondary_col_fills
+    )
+    header_fonts_per_col = (
+        [FONT_HEADER] * (9 + nc + nc + 4 + 5 + 5)
+        + secondary_col_fonts
     )
     for ci, cell in enumerate(ws[2], 1):
         cell.fill = header_fills[ci - 1] if ci - 1 < len(header_fills) else FILL_HEADER_MAIN
-        cell.font = FONT_HEADER
+        cell.font = header_fonts_per_col[ci - 1] if ci - 1 < len(header_fonts_per_col) else FONT_HEADER
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws.row_dimensions[2].height = 36
 
@@ -540,6 +597,9 @@ def generate_mobis_report(verification: dict) -> bytes:
         # 구간
         row_data += [rt.get("출발지", ""), rt.get("작업지", ""), rt.get("경유지", ""),
                      rt.get("도착지", ""), rt.get("ODCY도착지", "")]
+        # 2단계 검증결과 행 전체 (매칭 없으면 빈 셀 52개)
+        if has_secondary:
+            row_data += secondary_row_to_list(r.get("ref_full"))
 
         ws.append(row_data)
         excel_row = ws.max_row
@@ -597,6 +657,24 @@ def generate_mobis_report(verification: dict) -> bytes:
     route_start = ref_start + 5
     for i in range(5):
         ws.column_dimensions[get_column_letter(route_start + i)].width = 12
+
+    # 2단계 컬럼 너비 + 금액 컬럼 천단위 콤마 포맷
+    if has_secondary:
+        sec_col_start = route_start + 5  # 1-based
+        # 금액 포함 컬럼 인덱스(2단계 헤더 1-based)
+        money_sec_cols = {idx + 1 for idx, h in enumerate(SECONDARY_HEADERS)
+                          if "금액" in h or "단가" in h}
+        for i, h in enumerate(SECONDARY_HEADERS):
+            abs_col = sec_col_start + i
+            # 너비: 헤더 길이 기준 + 여유
+            w = max(10, min(len(h) + 4, 26))
+            ws.column_dimensions[get_column_letter(abs_col)].width = w
+            # 데이터 행에 number_format 적용
+            if (i + 1) in money_sec_cols:
+                for row_idx in range(3, ws.max_row + 1):
+                    cell = ws.cell(row=row_idx, column=abs_col)
+                    if isinstance(cell.value, (int, float)):
+                        cell.number_format = money_fmt
 
     ws.freeze_panes = "A3"
 
