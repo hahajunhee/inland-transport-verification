@@ -72,7 +72,7 @@
       <table class="data-table mobis-table" id="results-table">
         <thead>
           <!-- Row 1: 그룹 헤더 -->
-          <tr>
+          <tr id="mhead-row1">
             <th rowspan="2">#</th>
             <th rowspan="2">컨테이너<br>번호</th>
             <th rowspan="2">C/INV<br>번호</th>
@@ -89,7 +89,7 @@
             <th colspan="5" class="th-route">구간 (MOBIS 산출)</th>
           </tr>
           <!-- Row 2: 세부 항목 -->
-          <tr>
+          <tr id="mhead-row2">
             <th class="th-grove">내륙운임</th>
             <th class="th-grove">보관료</th>
             <th class="th-grove">상하차료</th>
@@ -174,6 +174,15 @@
 .th-ref   { background: #fef3c7 !important; color: #92400e; }
 .th-route { background: #f3e8ff !important; color: #6b21a8; }
 .th-expected { background: #dcfce7 !important; color: #15803d; }
+
+/* MOBIS 일자 (맨우측) */
+.th-date { background: #e2e8f0 !important; color: #334155; font-weight: 700; }
+.date-cell { font-size: 11px; white-space: nowrap; text-align: center; }
+
+/* [2단계] 동적 컬럼 */
+.th-secondary-group { font-weight: 700; }   /* bg/color 는 섹션별 inline */
+.th-secondary { font-size: 10px; }           /* bg/color 는 섹션별 inline */
+.sec-cell { font-size: 11px; white-space: nowrap; }
 
 /* 행 상태 */
 .row-error td { background: #fff0f0 !important; }
@@ -317,7 +326,70 @@ function showResults(data) {
   document.getElementById('s-ok').textContent = data.ok_count;
   document.getElementById('s-error').textContent = data.error_count;
 
+  buildDynamicHead(data);   // 엑셀과 동일하게 [2단계]·MOBIS 일자 헤더 동적 구성
   renderTable();
+}
+
+// ── 동적 헤더 구성 ([2단계] + MOBIS 일자) ──────────────────
+// 엑셀 다운로드(generate_mobis_report)와 동일한 컬럼 구조가 되도록 우측에 헤더 주입
+function buildDynamicHead(v) {
+  const r1 = document.getElementById('mhead-row1');
+  const r2 = document.getElementById('mhead-row2');
+  // 이전 동적 헤더 제거 (재업로드 대비)
+  r1.querySelectorAll('.dyn-th').forEach(e => e.remove());
+  r2.querySelectorAll('.dyn-th').forEach(e => e.remove());
+
+  // [2단계] 블록 — 2단계 세션 참조 선택 시에만
+  const secHeaders = v.secondary_headers || [];
+  const secSections = v.secondary_sections || [];
+  if (secHeaders.length) {
+    secSections.forEach(sec => {
+      const [start, end, label, gbg] = sec;   // [start,end,label,group_bg,col_bg,col_font]
+      const th = document.createElement('th');
+      th.className = 'dyn-th th-secondary-group';
+      th.colSpan = (end - start + 1);
+      th.textContent = '[2단계] ' + label;
+      th.style.background = '#' + gbg;
+      th.style.color = '#fff';
+      r1.appendChild(th);
+    });
+    secHeaders.forEach((h, i) => {
+      const col = i + 1;  // 1-based
+      let cbg = 'FFFFFF', cfont = '000000';
+      for (const sec of secSections) {
+        if (sec[0] <= col && col <= sec[1]) { cbg = sec[4]; cfont = sec[5]; break; }
+      }
+      const th = document.createElement('th');
+      th.className = 'dyn-th th-secondary';
+      th.textContent = '[2단계] ' + h;
+      th.style.background = '#' + cbg;
+      th.style.color = '#' + cfont;
+      r2.appendChild(th);
+    });
+  }
+
+  // MOBIS 일자 (항상 표시, 맨우측)
+  const dateHeaders = v.date_headers || ['출하일', 'ODCY 입고일', 'ODCY 반출일'];
+  const gth = document.createElement('th');
+  gth.className = 'dyn-th th-date';
+  gth.colSpan = dateHeaders.length;
+  gth.textContent = 'MOBIS 일자';
+  r1.appendChild(gth);
+  dateHeaders.forEach(h => {
+    const th = document.createElement('th');
+    th.className = 'dyn-th th-date';
+    th.innerHTML = h.replace(' ', '<br>');  // "ODCY 입고일" → 두 줄
+    r2.appendChild(th);
+  });
+}
+
+// 현재 테이블 총 컬럼 수 (기본 33 + [2단계] + 날짜 3)
+function totalColCount() {
+  const sec = (lastVerification && lastVerification.secondary_headers)
+    ? lastVerification.secondary_headers.length : 0;
+  const nd = (lastVerification && lastVerification.date_headers)
+    ? lastVerification.date_headers.length : 3;
+  return 33 + sec + nd;
 }
 
 function renderTable() {
@@ -328,7 +400,7 @@ function renderTable() {
   }
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="33" class="empty-msg">${currentFilter === 'ERROR' ? '오류 건이 없습니다.' : '결과가 없습니다.'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${totalColCount()}" class="empty-msg">${currentFilter === 'ERROR' ? '오류 건이 없습니다.' : '결과가 없습니다.'}</td></tr>`;
     document.getElementById('result-count').textContent = '';
     return;
   }
@@ -404,6 +476,28 @@ function renderTable() {
     const rt = r.route || {};
     ROUTE_KEYS.forEach(k => {
       html += `<td>${rt[k] || ''}</td>`;
+    });
+
+    // [2단계] 셀 (엑셀 secondary_row_to_list 와 동일 배열)
+    const secHeaders = lastVerification && lastVerification.secondary_headers;
+    if (secHeaders && secHeaders.length) {
+      const cells = r.secondary_cells || [];
+      secHeaders.forEach((h, idx) => {
+        let val = cells[idx];
+        if (val === null || val === undefined) val = '';
+        // 금액/단가 컬럼은 천단위 콤마
+        if ((h.includes('금액') || h.includes('단가')) && val !== '' && !isNaN(Number(val))) {
+          val = Number(val).toLocaleString('ko-KR');
+        }
+        html += `<td class="sec-cell">${val}</td>`;
+      });
+    }
+
+    // MOBIS 일자 (맨우측)
+    const dts = r.dates || {};
+    const dkeys = (lastVerification && lastVerification.date_keys) || ['출하일', 'ODCY입고일', 'ODCY반출일'];
+    dkeys.forEach(k => {
+      html += `<td class="date-cell">${dts[k] || ''}</td>`;
     });
 
     html += `</tr>`;

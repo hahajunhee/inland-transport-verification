@@ -18,6 +18,17 @@ _HEADER_ALIASES = {
 }
 _EXTRA_HEADERS = ["적요", "출발지", "작업지", "경유지"]
 
+# 날짜 컬럼 (MOBIS 엑셀에서 그대로 가져와 맨우측 "MOBIS 일자" 섹션으로 표시)
+# 엑셀 헤더가 줄바꿈/병합으로 줄건너뜀이 있어도 _norm(공백제거) 매칭으로 잡힘
+# 표시 라벨(헤더) → 내부 키(공백 제거형) 매핑
+_DATE_HEADER_TO_KEY = {
+    "출하일": "출하일",
+    "ODCY 입고일": "ODCY입고일",
+    "ODCY 반출일": "ODCY반출일",
+}
+_DATE_HEADERS = list(_DATE_HEADER_TO_KEY.keys())   # 표시 라벨
+_DATE_KEYS = list(_DATE_HEADER_TO_KEY.values())    # 내부 키
+
 # 구분 카테고리
 CAT_GROVE_ODCY = "GROVE ODCY 전송"
 CAT_GROVE = "GROVE 전송"
@@ -44,6 +55,15 @@ def _safe_str(value) -> str:
     return "" if s in ("nan", "None", "NaT") else s
 
 
+def _safe_date(value) -> str:
+    """날짜 셀 → 'YYYY-MM-DD' 문자열. 시간 부분(' 00:00:00')은 제거."""
+    s = _safe_str(value)
+    if not s:
+        return ""
+    # pandas dtype=str 로 읽은 datetime 은 '2025-01-15 00:00:00' 형태 → 날짜만
+    return s.split(" ")[0]
+
+
 def _find_header_columns(df: pd.DataFrame) -> dict:
     """
     1:2행 병합 헤더에서 필요 컬럼 위치를 찾는다.
@@ -53,7 +73,7 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
     """
     import re
 
-    ALL_HEADERS = _REQUIRED_HEADERS + _COST_HEADERS + _EXTRA_HEADERS
+    ALL_HEADERS = _REQUIRED_HEADERS + _COST_HEADERS + _EXTRA_HEADERS + _DATE_HEADERS
     nrows = min(5, len(df))
     dest_cols = []  # "도착지" 중복 처리용
 
@@ -219,6 +239,11 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
             else:
                 route[rk] = ""
 
+        # 날짜 정보 (출하일 / ODCY입고일 / ODCY반출일)
+        dates = {}
+        for hdr, key in _DATE_HEADER_TO_KEY.items():
+            dates[key] = _safe_date(df.iloc[ri, col_map[hdr]]) if hdr in col_map else ""
+
         rows.append({
             "container_no": container_no,
             "c_inv_no": c_inv,
@@ -227,6 +252,7 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
             "cost_sum": sum(costs.values()),
             "jukyo": jukyo,
             "route": route,
+            "dates": dates,
             "row_number": ri + 1,
         })
 
@@ -280,6 +306,11 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
       2) GROVE ODCY 전송 행이 존재
     ref_lookup: build_ref_lookup()으로 생성한 2단계 검증결과 참조 dict (선택).
     """
+    # 웹 화면을 엑셀 다운로드와 동일하게 렌더하기 위해 동일 헬퍼/헤더 사용 (단일 소스)
+    from app.services.excel_service import (
+        SECONDARY_HEADERS, SECONDARY_SECTIONS, secondary_row_to_list,
+    )
+
     rows = parsed["rows"]
     cost_headers = parsed["cost_headers"]
 
@@ -356,6 +387,21 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
         if mobis_rows:
             route_info = mobis_rows[0].get("route", route_info)
 
+        # 날짜 정보 (MOBIS 산출 행 우선, 비면 그룹 내 값 있는 행에서 보충)
+        date_info = {k: "" for k in _DATE_KEYS}
+        if mobis_rows:
+            for k in _DATE_KEYS:
+                v = (mobis_rows[0].get("dates") or {}).get(k)
+                if v:
+                    date_info[k] = v
+        for k in _DATE_KEYS:
+            if not date_info[k]:
+                for gr in group_rows:
+                    v = (gr.get("dates") or {}).get(k)
+                    if v:
+                        date_info[k] = v
+                        break
+
         # 정산검증 참조 (2단계 검증결과에서 키 매칭)
         ref = dict(_REF_EMPTY) if ref_lookup is not None else {f: "" for f in _REF_FIELDS}
         expected = dict(_EXPECTED_EMPTY) if ref_lookup is not None else {f: "" for f in _EXPECTED_FIELDS}
@@ -406,17 +452,31 @@ def run_mobis_verification(filename: str, parsed: dict, ref_lookup: dict = None)
             "expected": expected,
             "expected_diffs": expected_diffs,
             "ref_full": ref_full,  # 2단계 검증결과 행 전체 (다운로드 우측 52컬럼용)
+            "dates": date_info,    # MOBIS 일자 (출하일/ODCY입고일/ODCY반출일)
+            # 웹 화면용: 엑셀과 동일한 [2단계] 셀 배열 (참조 미선택 시 None)
+            "secondary_cells": (secondary_row_to_list(ref_full) if ref_lookup is not None else None),
         }
         results.append(result)
 
-    return {
+    # 참조 매칭된 행이 하나라도 있으면 [2단계] 블록 활성화 (엑셀과 동일 판정)
+    has_secondary = any(r.get("ref_full") for r in results)
+
+    out = {
         "filename": filename,
         "total_groups": len(results),
         "error_count": error_count,
         "ok_count": ok_count,
         "cost_headers": cost_headers,
         "results": results,
+        # MOBIS 일자 섹션 (항상 표시)
+        "date_headers": _DATE_HEADERS,   # 표시 라벨: 출하일/ODCY 입고일/ODCY 반출일
+        "date_keys": _DATE_KEYS,         # 내부 키: 출하일/ODCY입고일/ODCY반출일
     }
+    # [2단계] 블록 메타 (웹이 엑셀과 동일하게 동적 렌더하도록)
+    if has_secondary:
+        out["secondary_headers"] = SECONDARY_HEADERS
+        out["secondary_sections"] = SECONDARY_SECTIONS
+    return out
 
 
 def generate_mobis_report(verification: dict) -> bytes:
@@ -451,15 +511,19 @@ def generate_mobis_report(verification: dict) -> bytes:
     _ROUTE_LABELS = ["출발지", "작업지", "경유지", "도착지", "ODCY도착지"]
     FILL_HEADER_REF = PatternFill("solid", fgColor="B45309")
     FILL_HEADER_EXPECTED = PatternFill("solid", fgColor="15803D")
+    FILL_HEADER_DATE = PatternFill("solid", fgColor="475569")
     _EXPECTED_LABELS = ["TRKV예상금액", "보관료예상금액", "상하차료예상금액", "셔틀료예상금액"]
+    _DATE_LABELS = _DATE_HEADERS  # 출하일 / ODCY 입고일 / ODCY 반출일
+    nd = len(_DATE_LABELS)        # 날짜 컬럼 수 (3)
 
     # 2단계 검증결과 우측 확장 여부 (결과 중 ref_full 보유 행이 하나라도 있으면 활성화)
     results_list = verification.get("results") or []
     has_secondary = any(r.get("ref_full") for r in results_list)
-    sec_count = len(SECONDARY_HEADERS) if has_secondary else 0  # 보통 52
+    sec_count = len(SECONDARY_HEADERS) if has_secondary else 0  # 보통 57
 
     # ── Row 1: 그룹 헤더 (병합) ─────────────────────────────
-    total_cols = 9 + nc * 2 + 4 + 5 + 5 + sec_count  # 기본+GROVE+MOBIS+정산예상+정산참조+구간+2단계
+    # 기본+GROVE+MOBIS+정산예상+정산참조+구간+2단계+MOBIS일자
+    total_cols = 9 + nc * 2 + 4 + 5 + 5 + sec_count + nd
     ws.append([""] * total_cols)
     # 기본 정보 (1~9)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=9)
@@ -505,6 +569,13 @@ def generate_mobis_report(verification: dict) -> bytes:
             if abs_end > abs_start:
                 ws.merge_cells(start_row=1, start_column=abs_start,
                                end_row=1, end_column=abs_end)
+
+    # ── MOBIS 일자 그룹 헤더 (맨우측) ─────────────────────────
+    date_start = rte + sec_count + 1
+    date_end = date_start + nd - 1
+    ws.merge_cells(start_row=1, start_column=date_start, end_row=1, end_column=date_end)
+    c = ws.cell(row=1, column=date_start, value="MOBIS 일자")
+    c.fill = FILL_HEADER_DATE; c.font = FONT_HEADER; c.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 22
 
     # ── Row 2: 개별 컬럼 헤더 ───────────────────────────────
@@ -521,6 +592,7 @@ def generate_mobis_report(verification: dict) -> bytes:
     if has_secondary:
         # 2단계 컬럼명에 prefix "[2단계] " 부여 — 동일 명칭(예: "도착지명") 중복 회피
         headers2 += [f"[2단계] {h}" for h in SECONDARY_HEADERS]
+    headers2 += _DATE_LABELS  # MOBIS 일자 (맨우측)
 
     ws.append(headers2)
     # 2단계 섹션별 컬럼 배경색 (excel_service._SECTIONS 의 col_bg/col_font 사용)
@@ -546,10 +618,12 @@ def generate_mobis_report(verification: dict) -> bytes:
         + [FILL_HEADER_REF] * 5
         + [FILL_HEADER_ROUTE] * 5
         + secondary_col_fills
+        + [FILL_HEADER_DATE] * nd
     )
     header_fonts_per_col = (
         [FONT_HEADER] * (9 + nc + nc + 4 + 5 + 5)
         + secondary_col_fonts
+        + [FONT_HEADER] * nd
     )
     for ci, cell in enumerate(ws[2], 1):
         cell.fill = header_fills[ci - 1] if ci - 1 < len(header_fills) else FILL_HEADER_MAIN
@@ -600,6 +674,9 @@ def generate_mobis_report(verification: dict) -> bytes:
         # 2단계 검증결과 행 전체 (매칭 없으면 빈 셀 52개)
         if has_secondary:
             row_data += secondary_row_to_list(r.get("ref_full"))
+        # MOBIS 일자 (맨우측)
+        dts = r.get("dates") or {}
+        row_data += [dts.get(k, "") for k in _DATE_KEYS]
 
         ws.append(row_data)
         excel_row = ws.max_row
@@ -675,6 +752,11 @@ def generate_mobis_report(verification: dict) -> bytes:
                     cell = ws.cell(row=row_idx, column=abs_col)
                     if isinstance(cell.value, (int, float)):
                         cell.number_format = money_fmt
+
+    # MOBIS 일자 컬럼 너비
+    date_col_start = route_start + 5 + sec_count  # 1-based
+    for i in range(nd):
+        ws.column_dimensions[get_column_letter(date_col_start + i)].width = 13
 
     ws.freeze_panes = "A3"
 
