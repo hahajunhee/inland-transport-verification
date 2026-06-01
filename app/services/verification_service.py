@@ -295,7 +295,9 @@ def _run_verification_core(filename: str, rows: list) -> dict:
             return r
         r["unit_rate"] = price
         if str(wh or "").strip().upper() == "X":
-            r["expected"] = round(price * 1.2 * qty, -2)
+            # 할증(주말/휴일): quantity=1 기준 (단가×1.2)를 100원 단위 반올림한 뒤 수량을 곱함
+            # (단가×1.2×수량을 한꺼번에 반올림하지 않음)
+            r["expected"] = round(price * 1.2, -2) * qty
         else:
             r["expected"] = price * qty
         return r

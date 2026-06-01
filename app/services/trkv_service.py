@@ -374,9 +374,9 @@ def get_trkv_expected(
     if price is None:
         return None
 
-    # Weekend / Holiday "X" → 단가 × 1.2 × 수량, 100원 단위 반올림
+    # Weekend / Holiday "X" → quantity=1 기준 (단가×1.2)를 100원 단위 반올림한 뒤 수량 곱
     if str(weekend_holiday or "").strip().upper() == "X":
-        return round(price * 1.2 * quantity, -2)
+        return round(price * 1.2, -2) * quantity
     return price * quantity
 
 
@@ -435,7 +435,8 @@ def get_trkv_details(
 
     result["unit_rate"] = price
     if str(weekend_holiday or "").strip().upper() == "X":
-        result["expected"] = round(price * 1.2 * quantity, -2)
+        # quantity=1 기준 (단가×1.2)를 100원 단위 반올림한 뒤 수량 곱
+        result["expected"] = round(price * 1.2, -2) * quantity
     else:
         result["expected"] = price * quantity
     return result
