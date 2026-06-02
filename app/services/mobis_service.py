@@ -74,18 +74,51 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
     import re
 
     ALL_HEADERS = _REQUIRED_HEADERS + _COST_HEADERS + _EXTRA_HEADERS + _DATE_HEADERS
-    nrows = min(5, len(df))
+    ncols = len(df.columns)
+    nrows_total = len(df)
     dest_cols = []  # "도착지" 중복 처리용
 
     def _norm(text: str) -> str:
         """모든 공백(\n, \r, \t, 스페이스 등) 제거."""
-        return re.sub(r'\s+', '', text)
+        return re.sub(r'\s+', '', str(text))
 
-    # 각 컬럼의 후보 텍스트 수집
+    # 별칭 → 정규 헤더 역매핑 (norm 기준)
+    alias_to_header = {_norm(k): v for k, v in _HEADER_ALIASES.items()}
+
+    # ── 헤더 밴드 자동 탐지 ───────────────────────────────────────────
+    # 헤더가 항상 1~2행에 있는 게 아니라, 위에 제목/메타 행이 더 있을 수 있다.
+    # 시그니처 헤더가 가장 많이 등장하는 "인접 2행 윈도우" 를 헤더 밴드로 본다.
+    SIGNATURE = {_norm(h) for h in (_REQUIRED_HEADERS + _COST_HEADERS +
+                                    ["출발지", "도착지", "적요", "출하일"])}
+    SIGNATURE |= set(alias_to_header.keys())  # "상하자료" 등 별칭도 시그니처에 포함
+    scan_limit = min(30, nrows_total)
+    best_start, best_score = 0, -1
+    for r in range(scan_limit):
+        seen = 0
+        for ci in range(ncols):
+            for rr in (r, r + 1):
+                if rr >= nrows_total:
+                    continue
+                v = str(df.iloc[rr, ci]).strip()
+                if v and v != "nan" and _norm(v) in SIGNATURE:
+                    seen += 1
+                    break
+        if seen > best_score:
+            best_score, best_start = seen, r
+    # 시그니처를 거의 못 찾으면(비정상) 기존 동작(첫 행부터)으로 폴백
+    if best_score < 2:
+        best_start = 0
+    # 후보 수집용 밴드: 헤더가 1~2행에 걸칠 수 있어 2행을 본다.
+    # (병합된 단일 헤더는 윗행, 그룹 하위 항목은 아랫행에 위치)
+    band_rows = [best_start]
+    if best_start + 1 < nrows_total:
+        band_rows.append(best_start + 1)
+
+    # 각 컬럼의 후보 텍스트 수집 (헤더 밴드 행만)
     col_candidates = []
-    for ci in range(len(df.columns)):
+    for ci in range(ncols):
         candidates = []
-        for ri in range(nrows):
+        for ri in band_rows:
             val = str(df.iloc[ri, ci]).strip()
             if val and val != "nan":
                 candidates.append(val)
@@ -96,9 +129,6 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
             if _norm(val) == "도착지":
                 dest_cols.append(ci)
                 break
-
-    # 별칭 → 정규 헤더 역매핑 (norm 기준)
-    alias_to_header = {_norm(k): v for k, v in _HEADER_ALIASES.items()}
 
     # Pass 1: 정확 매칭 — 모든 발견 위치 수집
     # 별칭도 함께 검색 (예: "상하자료" → "상하차료")
@@ -168,20 +198,23 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
     elif len(dest_cols) == 1:
         col_map["도착지"] = dest_cols[0]
 
-    # 비용 항목 정확 매칭 후보 정보도 함께 반환
+    # 비용 항목 정확 매칭 후보 정보 + 헤더 시작행(데이터 탐색 힌트) 함께 반환
     cost_exact = {h: exact_matches.get(h, []) for h in _COST_HEADERS}
-    return col_map, cost_exact
+    return col_map, cost_exact, best_start
 
 
-def _find_data_start(df: pd.DataFrame, col_map: dict) -> int:
-    """헤더 행 이후 실제 데이터 시작 행 인덱스 반환."""
+def _find_data_start(df: pd.DataFrame, col_map: dict, scan_from: int = 0, fallback: int = 2) -> int:
+    """헤더 행 이후 실제 데이터 시작 행 인덱스 반환.
+    scan_from: 헤더 밴드 다음 행(이 행부터 탐색해 헤더/선행행을 데이터로 오인하지 않음).
+    fallback : 카테고리/컨테이너 패턴을 못 찾을 때 반환할 기본 데이터 시작행.
+    """
     gubun_col = col_map.get("구분")
     container_col = col_map.get("컨테이너 번호")
 
     if gubun_col is None:
-        return 2
+        return fallback
 
-    for ri in range(len(df)):
+    for ri in range(max(0, scan_from), len(df)):
         val = str(df.iloc[ri, gubun_col]).strip()
         if val in _CATEGORIES:
             return ri
@@ -190,13 +223,13 @@ def _find_data_start(df: pd.DataFrame, col_map: dict) -> int:
             if len(cont_val) >= 10 and cont_val[:4].isalpha():
                 return ri
 
-    return 2
+    return fallback
 
 
 def parse_mobis_excel(file_bytes: bytes) -> dict:
     """모비스 검증 엑셀 파싱."""
     df = pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
-    col_map, cost_exact = _find_header_columns(df)
+    col_map, cost_exact, header_start = _find_header_columns(df)
 
     # 필수 컬럼 확인
     missing = [h for h in _REQUIRED_HEADERS if h not in col_map]
@@ -207,7 +240,9 @@ def parse_mobis_excel(file_bytes: bytes) -> dict:
     if not found_costs:
         raise ValueError("비용 컬럼(내륙운임, 보관료, 상하차료, 셔틀료, 대기료)을 찾을 수 없습니다.")
 
-    data_start = _find_data_start(df, col_map)
+    # 헤더 시작행부터 스캔 → 헤더행(구분="구분" 등)은 자동 스킵, 첫 데이터행을 찾음.
+    # 카테고리/컨테이너 패턴을 못 찾으면 헤더 2행 다음(header_start+2)을 기본값으로.
+    data_start = _find_data_start(df, col_map, scan_from=header_start, fallback=header_start + 2)
 
     # 구간 컬럼 키 목록
     route_keys = ["출발지", "작업지", "경유지", "도착지", "ODCY도착지"]
