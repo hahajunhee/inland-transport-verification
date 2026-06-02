@@ -64,110 +64,97 @@ def _safe_date(value) -> str:
     return s.split(" ")[0]
 
 
-def _find_header_columns(df: pd.DataFrame) -> dict:
-    """
-    1:2행 병합 헤더에서 필요 컬럼 위치를 찾는다.
-    비용 항목(_COST_HEADERS)은 우측(마지막) 매칭 우선 — 동일 헤더가
-    여러 열에 있을 때 실제 비용 데이터가 있는 우측 열을 잡기 위함.
-    반환: {header_name: column_index}
-    """
-    import re
+import re as _re
 
+# 보이지 않는 문자(zero-width 등) — 헤더 매칭 전 제거
+_INVISIBLE = ("​", "‌", "‍", "﻿", " ")
+
+
+def _norm(text) -> str:
+    """헤더 비교용 정규화 — 모든 공백(\\n \\r \\t 스페이스)·줄넘김·보이지 않는 문자 제거."""
+    s = str(text)
+    for ch in _INVISIBLE:
+        s = s.replace(ch, "")
+    return _re.sub(r"\s+", "", s)
+
+
+def _expand_merged_cells(file_bytes: bytes, df: "pd.DataFrame") -> "pd.DataFrame":
+    """엑셀의 병합셀을 모두 해제한 효과 — 각 병합 범위를 좌상단(anchor) 값으로 채운다.
+    pandas 는 병합셀을 좌상단에만 값으로 읽고 나머지는 NaN 으로 두기 때문에,
+    헤더가 병합되어 있으면 인식이 어긋난다. 이를 보정한다.
+    실패 시(예: .xls) 원본 df 를 그대로 반환.
+    """
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(BytesIO(file_bytes), read_only=False, data_only=True)
+        ws = wb.active
+        nrows, ncols = df.shape
+        for mr in list(ws.merged_cells.ranges):
+            r0, c0 = mr.min_row - 1, mr.min_col - 1          # 0-based
+            r1, c1 = mr.max_row - 1, mr.max_col - 1
+            if r0 < 0 or c0 < 0 or r0 >= nrows or c0 >= ncols:
+                continue
+            anchor = df.iat[r0, c0]
+            for rr in range(r0, min(r1, nrows - 1) + 1):
+                for cc in range(c0, min(c1, ncols - 1) + 1):
+                    df.iat[rr, cc] = anchor
+        wb.close()
+    except Exception:
+        pass
+    return df
+
+
+def _match_headers_in_rows(df, rows: list, alias_to_header: dict):
+    """주어진 행들에서 헤더 컬럼을 매칭하여 (col_map, cost_exact) 반환."""
     ALL_HEADERS = _REQUIRED_HEADERS + _COST_HEADERS + _EXTRA_HEADERS + _DATE_HEADERS
     ncols = len(df.columns)
     nrows_total = len(df)
-    dest_cols = []  # "도착지" 중복 처리용
+    dest_cols = []
 
-    def _norm(text: str) -> str:
-        """모든 공백(\n, \r, \t, 스페이스 등) 제거."""
-        return re.sub(r'\s+', '', str(text))
-
-    # 별칭 → 정규 헤더 역매핑 (norm 기준)
-    alias_to_header = {_norm(k): v for k, v in _HEADER_ALIASES.items()}
-
-    # ── 헤더 밴드 자동 탐지 ───────────────────────────────────────────
-    # 헤더가 항상 1~2행에 있는 게 아니라, 위에 제목/메타 행이 더 있을 수 있다.
-    # 시그니처 헤더가 가장 많이 등장하는 "인접 2행 윈도우" 를 헤더 밴드로 본다.
-    SIGNATURE = {_norm(h) for h in (_REQUIRED_HEADERS + _COST_HEADERS +
-                                    ["출발지", "도착지", "적요", "출하일"])}
-    SIGNATURE |= set(alias_to_header.keys())  # "상하자료" 등 별칭도 시그니처에 포함
-    scan_limit = min(30, nrows_total)
-    best_start, best_score = 0, -1
-    for r in range(scan_limit):
-        seen = 0
-        for ci in range(ncols):
-            for rr in (r, r + 1):
-                if rr >= nrows_total:
-                    continue
-                v = str(df.iloc[rr, ci]).strip()
-                if v and v != "nan" and _norm(v) in SIGNATURE:
-                    seen += 1
-                    break
-        if seen > best_score:
-            best_score, best_start = seen, r
-    # 시그니처를 거의 못 찾으면(비정상) 기존 동작(첫 행부터)으로 폴백
-    if best_score < 2:
-        best_start = 0
-    # 후보 수집용 밴드: 헤더가 1~2행에 걸칠 수 있어 2행을 본다.
-    # (병합된 단일 헤더는 윗행, 그룹 하위 항목은 아랫행에 위치)
-    band_rows = [best_start]
-    if best_start + 1 < nrows_total:
-        band_rows.append(best_start + 1)
-
-    # 각 컬럼의 후보 텍스트 수집 (헤더 밴드 행만)
     col_candidates = []
     for ci in range(ncols):
         candidates = []
-        for ri in band_rows:
+        for ri in rows:
+            if ri < 0 or ri >= nrows_total:
+                continue
             val = str(df.iloc[ri, ci]).strip()
             if val and val != "nan":
                 candidates.append(val)
         col_candidates.append(candidates)
-
-        # "도착지" 개별 수집 (중복 가능 — 구간/ODCY)
         for val in candidates:
             if _norm(val) == "도착지":
                 dest_cols.append(ci)
                 break
 
-    # Pass 1: 정확 매칭 — 모든 발견 위치 수집
-    # 별칭도 함께 검색 (예: "상하자료" → "상하차료")
+    # Pass 1: 정확 매칭(+별칭) — 모든 발견 위치
     exact_matches: dict[str, list[int]] = {}
     for ci, candidates in enumerate(col_candidates):
         for header in ALL_HEADERS:
             norm_header = _norm(header)
             for val in candidates:
                 nv = _norm(val)
-                # 직접 매칭
                 if nv == norm_header:
                     exact_matches.setdefault(header, []).append(ci)
                     break
-                # 별칭 매칭: 엑셀 값이 별칭이고, 그 별칭의 정규 헤더가 현재 header이면
                 if alias_to_header.get(nv) == header:
                     exact_matches.setdefault(header, []).append(ci)
                     break
 
-    # 할당
     col_map = {}
 
-    # 비용 항목: 클러스터 기반 — 인접한 컬럼 그룹 중 가장 많은
-    # 고유 비용 헤더를 포함하는 클러스터를 선택
+    # 비용 항목: 클러스터 기반 (인접 컬럼 그룹 중 고유 헤더 최다, 동률 시 우측)
     cost_col_info = []
     for h in _COST_HEADERS:
         for ci in exact_matches.get(h, []):
             cost_col_info.append((ci, h))
     cost_col_info.sort()
-
     if cost_col_info:
-        # 클러스터링: 간격 10 이내를 같은 그룹으로
         clusters = [[cost_col_info[0]]]
         for ci, h in cost_col_info[1:]:
             if ci - clusters[-1][-1][0] <= 10:
                 clusters[-1].append((ci, h))
             else:
                 clusters.append([(ci, h)])
-
-        # 가장 많은 고유 헤더를 가진 클러스터 (동률 시 우측 우선)
         best = max(clusters, key=lambda c: (
             len(set(h for _, h in c)),
             max(ci for ci, _ in c),
@@ -175,14 +162,14 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
         for ci, h in best:
             col_map[h] = ci
 
-    # 나머지 헤더 (비-비용): 좌측 첫 매칭
+    # 나머지 헤더(비-비용): 좌측 첫 매칭
     for header in ALL_HEADERS:
         if header in col_map:
             continue
         if header in exact_matches:
             col_map[header] = exact_matches[header][0]
 
-    # Pass 2: combined 텍스트에서 부분 매칭 (미발견 헤더만)
+    # Pass 2: combined 부분 매칭 (미발견 헤더만)
     for ci, candidates in enumerate(col_candidates):
         norm_combined = _norm("".join(candidates))
         for header in ALL_HEADERS:
@@ -198,8 +185,61 @@ def _find_header_columns(df: pd.DataFrame) -> dict:
     elif len(dest_cols) == 1:
         col_map["도착지"] = dest_cols[0]
 
-    # 비용 항목 정확 매칭 후보 정보 + 헤더 시작행(데이터 탐색 힌트) 함께 반환
     cost_exact = {h: exact_matches.get(h, []) for h in _COST_HEADERS}
+    return col_map, cost_exact
+
+
+def _find_header_columns(df: pd.DataFrame):
+    """
+    병합·줄넘김이 섞인 1~2행 헤더에서 필요 컬럼 위치를 찾는다.
+    헤더 위에 제목/메타 행이 있어도 대응하도록 헤더 밴드를 자동 탐지하고,
+    실패 시 점점 넓은 행 범위로 재시도한다.
+    반환: (col_map, cost_exact, header_start)
+    """
+    ncols = len(df.columns)
+    nrows_total = len(df)
+    alias_to_header = {_norm(k): v for k, v in _HEADER_ALIASES.items()}
+
+    # ── 헤더 밴드 자동 탐지 ──
+    SIGNATURE = {_norm(h) for h in (_REQUIRED_HEADERS + _COST_HEADERS +
+                                    ["출발지", "도착지", "적요", "출하일"])}
+    SIGNATURE |= set(alias_to_header.keys())
+    scan_limit = min(30, nrows_total)
+    best_start, best_score = 0, -1
+    for r in range(scan_limit):
+        seen = 0
+        for ci in range(ncols):
+            for rr in (r, r + 1):
+                if rr >= nrows_total:
+                    continue
+                v = str(df.iloc[rr, ci]).strip()
+                if v and v != "nan" and _norm(v) in SIGNATURE:
+                    seen += 1
+                    break
+        if seen > best_score:
+            best_score, best_start = seen, r
+    if best_score < 2:
+        best_start = 0
+
+    band = [best_start]
+    if best_start + 1 < nrows_total:
+        band.append(best_start + 1)
+
+    # 후보 행 범위: 밴드 → 밴드 주변 → 첫 30행 전체 순으로 넓혀가며,
+    # 필수 헤더를 모두 찾으면 즉시 채택 (넓은 범위의 데이터 오염 최소화)
+    attempts = [
+        band,
+        list(range(max(0, best_start - 1), min(best_start + 3, nrows_total))),
+        list(range(0, min(30, nrows_total))),
+    ]
+    last = ({}, {})
+    for rows in attempts:
+        col_map, cost_exact = _match_headers_in_rows(df, rows, alias_to_header)
+        last = (col_map, cost_exact)
+        if all(h in col_map for h in _REQUIRED_HEADERS):
+            break
+
+    col_map, cost_exact = last
     return col_map, cost_exact, best_start
 
 
@@ -229,6 +269,8 @@ def _find_data_start(df: pd.DataFrame, col_map: dict, scan_from: int = 0, fallba
 def parse_mobis_excel(file_bytes: bytes) -> dict:
     """모비스 검증 엑셀 파싱."""
     df = pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
+    # 병합셀 해제(anchor 값으로 채움) — 병합된 헤더 인식 보정
+    df = _expand_merged_cells(file_bytes, df)
     col_map, cost_exact, header_start = _find_header_columns(df)
 
     # 필수 컬럼 확인
