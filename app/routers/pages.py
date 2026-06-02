@@ -53,6 +53,11 @@ def mobis_page(request: Request):
     return templates.TemplateResponse("mobis.html", {"request": request})
 
 
+@router.get("/reconcile")
+def reconcile_page(request: Request):
+    return templates.TemplateResponse("reconcile.html", {"request": request})
+
+
 @router.get("/rate-register")
 def rate_register_page(request: Request):
     return templates.TemplateResponse("rate_register.html", {"request": request})
