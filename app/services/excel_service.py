@@ -453,6 +453,9 @@ def generate_fwo_charge_excel(results: list) -> bytes:
             rate_amount = diff_val
             tax_amount = round(rate_amount * 0.1)
             is_negative = rate_amount < 0
+            # 양수이면서 1원 이상 10원 미만(1~9원)인 미세 금액도 강조
+            is_small_positive = (1 <= rate_amount < 10)
+            highlight = is_negative or is_small_positive
             reason_detail = "음수 금액 - 매출인보이스 엑셀 업로드 시 해당 행 삭제 필요" if is_negative else ""
 
             row_data = [
@@ -481,8 +484,8 @@ def generate_fwo_charge_excel(results: list) -> bytes:
                 cell.font = Font(size=10)
                 if col_idx in (8, 11, 13):  # H, K, M: 금액 포맷
                     cell.number_format = money_fmt
-                # 음수 행: 노란 음영
-                if is_negative:
+                # 노란 음영: 음수 금액 또는 양수 1~9원(미세 금액)
+                if highlight:
                     cell.fill = FILL_NEGATIVE
 
     buf = BytesIO()
