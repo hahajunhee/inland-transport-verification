@@ -4,6 +4,7 @@ data/*.db
 data/*.db-wal
 data/*.db-shm
 data/results/
+data/checklist/
 
 # Python 캐시
 __pycache__/
