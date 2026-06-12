@@ -44,6 +44,9 @@
     <!-- 정산업로드업데이트 토글 (복원 버튼 우측) -->
     <button id="autopress-btn" class="btn btn-sm btn-outline" style="margin-left:auto"
             onclick="toggleAutoPress()">정산업로드업데이트</button>
+    <input type="number" id="autopress-sec" min="1" value="900" onchange="setAutoInterval()"
+           style="width:74px;padding:5px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:13px" />
+    <span style="font-size:12px;color:#888">초</span>
     <span id="autopress-info" style="font-size:12px;color:#888"></span>
   </div>
 </div>
@@ -160,16 +163,28 @@ function renderAutoPress(s) {
   } else {
     btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
   }
+  const sec = document.getElementById("autopress-sec");
+  if (sec && document.activeElement !== sec && s.interval_sec) sec.value = s.interval_sec;
   if (!s.supported) info.textContent = "※ 이 OS에서는 미지원";
   else info.textContent = s.enabled ? "ON" : "OFF";
 }
 async function loadAutoPressStatus() {
   try { const r = await fetch("/api/autopress/status"); renderAutoPress(await r.json()); } catch {}
 }
+function currentSec() {
+  const v = parseInt(document.getElementById("autopress-sec").value, 10);
+  return (v && v >= 1) ? v : 900;
+}
+async function setAutoInterval() {
+  try {
+    const r = await fetch("/api/autopress/interval", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ interval_sec: currentSec() }) });
+    renderAutoPress(await r.json());
+  } catch {}
+}
 async function toggleAutoPress() {
   const next = !autoPressOn;
   try {
-    const r = await fetch("/api/autopress/toggle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: next }) });
+    const r = await fetch("/api/autopress/toggle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: next, interval_sec: currentSec() }) });
     renderAutoPress(await r.json());
   } catch { alert("토글 실패"); }
 }
