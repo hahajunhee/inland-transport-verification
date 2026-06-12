@@ -161,7 +161,7 @@ function renderAutoPress(s) {
     btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
   }
   if (!s.supported) info.textContent = "※ 이 OS에서는 미지원";
-  else info.textContent = s.enabled ? `ON · ${s.interval_min}분 주기` : "OFF";
+  else info.textContent = s.enabled ? "ON" : "OFF";
 }
 async function loadAutoPressStatus() {
   try { const r = await fetch("/api/autopress/status"); renderAutoPress(await r.json()); } catch {}
