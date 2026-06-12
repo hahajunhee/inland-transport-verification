@@ -41,10 +41,9 @@
       <input type="file" id="restore-file" accept=".json" style="display:none" onchange="restoreBackup()" />
     </label>
     <span id="restore-msg" style="font-size:13px;display:none"></span>
-    <!-- 자동 F5 토글 (복원 버튼 우측) -->
+    <!-- 정산업로드업데이트 토글 (복원 버튼 우측) -->
     <button id="autopress-btn" class="btn btn-sm btn-outline" style="margin-left:auto"
-            onclick="toggleAutoPress()"
-            title="켜면 15분마다 현재 활성(포커스된) 창에 F5 키를 입력합니다(화면 새로고침). 서버 실행 중에만 동작.">⏱ 자동 F5 OFF</button>
+            onclick="toggleAutoPress()">정산업로드업데이트</button>
     <span id="autopress-info" style="font-size:12px;color:#888"></span>
   </div>
 </div>
@@ -155,25 +154,20 @@ function renderAutoPress(s) {
   autoPressOn = s.enabled;
   const btn = document.getElementById("autopress-btn");
   const info = document.getElementById("autopress-info");
+  btn.textContent = "정산업로드업데이트";
   if (s.enabled) {
-    btn.textContent = `⏱ 자동 F5 ON (${s.interval_min}분)`;
     btn.style.background = "#16a34a"; btn.style.color = "#fff"; btn.style.borderColor = "#16a34a";
   } else {
-    btn.textContent = "⏱ 자동 F5 OFF";
     btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
   }
-  let txt = "";
-  if (!s.supported) txt = "※ 이 OS에서는 키 입력 미지원";
-  else if (s.enabled) txt = `전송 ${s.press_count}회` + (s.last_press_ts ? ` · 최근 ${new Date(s.last_press_ts*1000).toLocaleTimeString("ko-KR")}` : " · 15분 후 첫 전송");
-  else if (s.press_count) txt = `전송 ${s.press_count}회`;
-  info.textContent = txt;
+  if (!s.supported) info.textContent = "※ 이 OS에서는 미지원";
+  else info.textContent = s.enabled ? `ON · ${s.interval_min}분 주기` : "OFF";
 }
 async function loadAutoPressStatus() {
   try { const r = await fetch("/api/autopress/status"); renderAutoPress(await r.json()); } catch {}
 }
 async function toggleAutoPress() {
   const next = !autoPressOn;
-  if (next && !confirm("자동 F5 입력을 켭니다.\n15분마다 현재 활성(포커스된) 창에 F5 키가 입력됩니다(화면 새로고침).\n서버가 실행 중일 때만 동작합니다.\n\n계속할까요?")) return;
   try {
     const r = await fetch("/api/autopress/toggle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: next }) });
     renderAutoPress(await r.json());
