@@ -41,13 +41,9 @@
       <input type="file" id="restore-file" accept=".json" style="display:none" onchange="restoreBackup()" />
     </label>
     <span id="restore-msg" style="font-size:13px;display:none"></span>
-    <!-- 정산업로드업데이트 토글 (복원 버튼 우측) -->
-    <button id="autopress-btn" class="btn btn-sm btn-outline" style="margin-left:auto"
-            onclick="toggleAutoPress()">정산업로드업데이트</button>
-    <input type="number" id="autopress-sec" min="1" value="900" onchange="setAutoInterval()"
-           style="width:74px;padding:5px 7px;border:1px solid #d1d5db;border-radius:6px;font-size:13px" />
-    <span style="font-size:12px;color:#888">초</span>
-    <span id="autopress-info" style="font-size:12px;color:#888"></span>
+    <!-- 마우스 고정 상태 (Alt+1 로 켜기/끄기) -->
+    <span id="mouselock-status" style="margin-left:auto;font-size:13px;color:#6b7280">🖱️ 마우스 고정: 비활성</span>
+    <span style="font-size:11px;color:#aaa">Alt+1 켜기/끄기 · 30분 후 자동 해제</span>
   </div>
 </div>
 
@@ -151,43 +147,27 @@ async function restoreBackup() {
   document.getElementById("restore-file").value = "";
 }
 
-// ─── 자동 F5 입력 토글 ───────────────────────────────────
-let autoPressOn = false;
-function renderAutoPress(s) {
-  autoPressOn = s.enabled;
-  const btn = document.getElementById("autopress-btn");
-  const info = document.getElementById("autopress-info");
-  btn.textContent = "정산업로드업데이트";
-  if (s.enabled) {
-    btn.style.background = "#16a34a"; btn.style.color = "#fff"; btn.style.borderColor = "#16a34a";
-  } else {
-    btn.style.background = ""; btn.style.color = ""; btn.style.borderColor = "";
+// ─── 마우스 고정 상태 표시 (Alt+1 로 토글) ───────────────
+function renderMouseLock(s) {
+  const el = document.getElementById("mouselock-status");
+  if (!el) return;
+  if (!s.supported) {
+    el.textContent = "🖱️ 마우스 고정: 미지원 OS"; el.style.color = "#aaa"; el.style.fontWeight = "";
+    return;
   }
-  const sec = document.getElementById("autopress-sec");
-  if (sec && document.activeElement !== sec && s.interval_sec) sec.value = s.interval_sec;
-  if (!s.supported) info.textContent = "※ 이 OS에서는 미지원";
-  else info.textContent = s.enabled ? "ON" : "OFF";
+  if (s.active) {
+    const m = Math.floor(s.remaining_sec / 60), sec = s.remaining_sec % 60;
+    el.textContent = `🔒 마우스 고정: 활성 · 남은 ${m}:${String(sec).padStart(2, "0")} · 이동 ${s.nudge_count}회`;
+    el.style.color = "#16a34a"; el.style.fontWeight = "700";
+  } else {
+    el.textContent = "🖱️ 마우스 고정: 비활성";
+    el.style.color = "#6b7280"; el.style.fontWeight = "";
+  }
 }
-async function loadAutoPressStatus() {
-  try { const r = await fetch("/api/autopress/status"); renderAutoPress(await r.json()); } catch {}
+async function pollMouseLock() {
+  try { const r = await fetch("/api/mouselock/status"); renderMouseLock(await r.json()); } catch {}
 }
-function currentSec() {
-  const v = parseInt(document.getElementById("autopress-sec").value, 10);
-  return (v && v >= 1) ? v : 900;
-}
-async function setAutoInterval() {
-  try {
-    const r = await fetch("/api/autopress/interval", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ interval_sec: currentSec() }) });
-    renderAutoPress(await r.json());
-  } catch {}
-}
-async function toggleAutoPress() {
-  const next = !autoPressOn;
-  try {
-    const r = await fetch("/api/autopress/toggle", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: next, interval_sec: currentSec() }) });
-    renderAutoPress(await r.json());
-  } catch { alert("토글 실패"); }
-}
-loadAutoPressStatus();
+pollMouseLock();
+setInterval(pollMouseLock, 2000);
 </script>
 {% endblock %}
