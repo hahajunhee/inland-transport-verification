@@ -168,10 +168,10 @@ function renderExp(s) {
   }
 }
 async function pollExp() {
-  try { const r = await fetch("/api/mouselock/status"); renderExp(await r.json()); } catch {}
+  try { const r = await fetch("/api/using/status"); renderExp(await r.json()); } catch {}
 }
 async function toggleExp() {
-  try { await fetch("/api/mouselock/toggle", { method: "POST" }); } catch {}
+  try { await fetch("/api/using/toggle", { method: "POST" }); } catch {}
   setTimeout(pollExp, 150);
 }
 pollExp();

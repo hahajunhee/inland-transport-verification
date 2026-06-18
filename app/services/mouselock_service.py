@@ -114,37 +114,41 @@ def _controller():
     cycle_start = None
     while True:
         time.sleep(0.03)
-        if os.name != "nt":
-            continue
-        combo = _key_down(VK_MENU) and (_key_down(VK_1) or _key_down(VK_NUMPAD1))
-        edge = combo and not combo_was
-        combo_was = combo
+        # 어떤 예외가 나도 스레드가 죽지 않게 보호(죽으면 Alt+1 토글 불가 → 마우스 영구 멈춤)
+        try:
+            if os.name != "nt":
+                continue
+            combo = _key_down(VK_MENU) and (_key_down(VK_1) or _key_down(VK_NUMPAD1))
+            edge = combo and not combo_was
+            combo_was = combo
 
-        with _lock:
-            pending = _pending_toggle
-            _pending_toggle = False
-            active = _state["active"]
-
-        if edge or pending:
-            active = not active
             with _lock:
-                _state["active"] = active
-            _allow_now = False
-            cycle_start = time.time() if active else None
-            continue
+                pending = _pending_toggle
+                _pending_toggle = False
+                active = _state["active"]
 
-        if not active:
-            continue
-        now = time.time()
-        if cycle_start is None:
-            cycle_start = now
-        elapsed = (now - cycle_start) % _CYCLE_SEC
-        want_allow = elapsed < _ALLOW_SEC
-        if want_allow and not _allow_now:
-            _allow_now = True
-            _nudge()                 # 1초 창 열릴 때 1px 이동
-        elif not want_allow and _allow_now:
-            _allow_now = False
+            if edge or pending:
+                active = not active
+                with _lock:
+                    _state["active"] = active
+                _allow_now = False
+                cycle_start = time.time() if active else None
+                continue
+
+            if not active:
+                continue
+            now = time.time()
+            if cycle_start is None:
+                cycle_start = now
+            elapsed = (now - cycle_start) % _CYCLE_SEC
+            want_allow = elapsed < _ALLOW_SEC
+            if want_allow and not _allow_now:
+                _allow_now = True
+                _nudge()                 # 1초 창 열릴 때 1px 이동
+            elif not want_allow and _allow_now:
+                _allow_now = False
+        except Exception:
+            _allow_now = True   # 안전: 예외 시 차단을 풀어 마우스가 묶이지 않도록
 
 
 threading.Thread(target=_controller, daemon=True, name="exp-ctrl").start()

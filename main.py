@@ -30,8 +30,10 @@ app.include_router(storage_rates.router, prefix="/api/storage-rates", tags=["sto
 app.include_router(checklist.router, prefix="/api/checklist", tags=["checklist"])
 app.include_router(mobis.router, prefix="/api/mobis", tags=["mobis"])
 app.include_router(reconcile.router, prefix="/api/reconcile", tags=["reconcile"])
-app.include_router(mouselock.router, prefix="/api/mouselock", tags=["mouselock"])
+app.include_router(mouselock.router, prefix="/api/using", tags=["using"])
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    # reload=False: 핫리로드를 끄면 단일 프로세스로 실행됨
+    # (reload 시 런처+워커 두 프로세스가 각각 입력 훅을 설치해 토글이 어긋나는 문제 방지)
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=False)
