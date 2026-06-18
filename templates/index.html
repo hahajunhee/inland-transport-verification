@@ -2,8 +2,15 @@
 {% block title %}대시보드 - 내륙운송정산검증{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
   <h1 class="page-title">대시보드</h1>
+  <div style="position:relative">
+    <button id="gear-btn" onclick="toggleSettings()" title="설정"
+            style="background:none;border:none;font-size:22px;cursor:pointer;line-height:1">⚙️</button>
+    <div id="settings-panel" style="display:none;position:absolute;right:0;top:34px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);padding:10px;z-index:20">
+      <button id="exp-btn" class="btn btn-sm btn-outline" onclick="toggleExp()" style="white-space:nowrap">실험</button>
+    </div>
+  </div>
 </div>
 
 <!-- 요약 카드 -->
@@ -41,9 +48,6 @@
       <input type="file" id="restore-file" accept=".json" style="display:none" onchange="restoreBackup()" />
     </label>
     <span id="restore-msg" style="font-size:13px;display:none"></span>
-    <!-- 마우스 고정 상태 (Alt+1 로 켜기/끄기) -->
-    <span id="mouselock-status" style="margin-left:auto;font-size:13px;color:#6b7280">🖱️ 마우스 고정: 비활성</span>
-    <span style="font-size:11px;color:#aaa">Alt+1 켜기/끄기 · 30분 후 자동 해제</span>
   </div>
 </div>
 
@@ -147,27 +151,30 @@ async function restoreBackup() {
   document.getElementById("restore-file").value = "";
 }
 
-// ─── 마우스 고정 상태 표시 (Alt+1 로 토글) ───────────────
-function renderMouseLock(s) {
-  const el = document.getElementById("mouselock-status");
-  if (!el) return;
-  if (!s.supported) {
-    el.textContent = "🖱️ 마우스 고정: 미지원 OS"; el.style.color = "#aaa"; el.style.fontWeight = "";
-    return;
-  }
+// ─── 설정 ▸ 실험 ─────────────────────────────────────────
+function toggleSettings() {
+  const p = document.getElementById("settings-panel");
+  p.style.display = (p.style.display === "none" || !p.style.display) ? "block" : "none";
+}
+function renderExp(s) {
+  const b = document.getElementById("exp-btn");
+  if (!b) return;
   if (s.active) {
-    const m = Math.floor(s.remaining_sec / 60), sec = s.remaining_sec % 60;
-    el.textContent = `🔒 마우스 고정: 활성 · 남은 ${m}:${String(sec).padStart(2, "0")} · 이동 ${s.nudge_count}회`;
-    el.style.color = "#16a34a"; el.style.fontWeight = "700";
+    b.textContent = "실행중";
+    b.style.background = "#16a34a"; b.style.color = "#fff"; b.style.borderColor = "#16a34a";
   } else {
-    el.textContent = "🖱️ 마우스 고정: 비활성";
-    el.style.color = "#6b7280"; el.style.fontWeight = "";
+    b.textContent = "실험";
+    b.style.background = ""; b.style.color = ""; b.style.borderColor = "";
   }
 }
-async function pollMouseLock() {
-  try { const r = await fetch("/api/mouselock/status"); renderMouseLock(await r.json()); } catch {}
+async function pollExp() {
+  try { const r = await fetch("/api/mouselock/status"); renderExp(await r.json()); } catch {}
 }
-pollMouseLock();
-setInterval(pollMouseLock, 2000);
+async function toggleExp() {
+  try { await fetch("/api/mouselock/toggle", { method: "POST" }); } catch {}
+  setTimeout(pollExp, 150);
+}
+pollExp();
+setInterval(pollExp, 2000);
 </script>
 {% endblock %}
