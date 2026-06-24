@@ -201,7 +201,7 @@ const STAGE_META = {
     desc:'필수 열 공란 여부 + PORT_DRT 예외 처리',
     logic: `<b>항상 필수:</b> 픽업지명, 출하지명, 도착지명, 출하일, 터미널 반입일, 선적일 → 공란이면 오류
 <b>ODCY ≠ PORT_DRT일 때 추가 필수:</b> 상세 ODCY, ODCY 반입일, ODCY 반출일, ODCY 도착지명 → 공란이면 오류
-<b>ODCY = PORT_DRT(직반입)일 때:</b> 상세 ODCY, ODCY 반입일, ODCY 반출일, ODCY 도착지명 → 값이 있으면 오류`
+<b>ODCY = PORT_DRT(직반입)일 때:</b> 상세 ODCY → 'PORT_DRT' 가 있어야 정상(공란이면 오류) / ODCY 반입일·반출일·도착지명 → 값이 있으면 오류`
   },
   '2': {
     name:'리퍼 / DG 체크',

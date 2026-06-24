@@ -2,15 +2,8 @@
 {% block title %}대시보드 - 내륙운송정산검증{% endblock %}
 
 {% block content %}
-<div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+<div class="page-header">
   <h1 class="page-title">대시보드</h1>
-  <div style="position:relative">
-    <button id="gear-btn" onclick="toggleSettings()" title="설정"
-            style="background:none;border:none;font-size:22px;cursor:pointer;line-height:1">⚙️</button>
-    <div id="settings-panel" style="display:none;position:absolute;right:0;top:34px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.12);padding:10px;z-index:20">
-      <button id="exp-btn" class="btn btn-sm btn-outline" onclick="toggleExp()" style="white-space:nowrap">실험</button>
-    </div>
-  </div>
 </div>
 
 <!-- 요약 카드 -->
@@ -150,31 +143,5 @@ async function restoreBackup() {
   }
   document.getElementById("restore-file").value = "";
 }
-
-// ─── 설정 ▸ 실험 ─────────────────────────────────────────
-function toggleSettings() {
-  const p = document.getElementById("settings-panel");
-  p.style.display = (p.style.display === "none" || !p.style.display) ? "block" : "none";
-}
-function renderExp(s) {
-  const b = document.getElementById("exp-btn");
-  if (!b) return;
-  if (s.active) {
-    b.textContent = "실행중";
-    b.style.background = "#16a34a"; b.style.color = "#fff"; b.style.borderColor = "#16a34a";
-  } else {
-    b.textContent = "실험";
-    b.style.background = ""; b.style.color = ""; b.style.borderColor = "";
-  }
-}
-async function pollExp() {
-  try { const r = await fetch("/api/using/status"); renderExp(await r.json()); } catch {}
-}
-async function toggleExp() {
-  try { await fetch("/api/using/toggle", { method: "POST" }); } catch {}
-  setTimeout(pollExp, 150);
-}
-pollExp();
-setInterval(pollExp, 2000);
 </script>
 {% endblock %}

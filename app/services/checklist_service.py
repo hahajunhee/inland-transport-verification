@@ -190,7 +190,19 @@ def check_stage1(rows: list[dict]) -> list[dict]:
                 })
 
         if is_port_drt:
+            # 상세 ODCY: 직반입이면 'PORT_DRT' 가 들어가야 타리프가 적용됨 → 공란이면 오류
+            if _is_blank(row.get("odcy_code")):
+                errors.append({
+                    "row_number": row["row_number"],
+                    "container_no": row.get("container_no"),
+                    "column": "상세 ODCY",
+                    "value": "",
+                    "reason": "직반입(PORT_DRT)인데 상세 ODCY가 공란입니다. 내륙정산리포트에서 PORT_DRT를 넣어야 타리프가 도니까 확인해주세요.",
+                })
+            # 나머지 ODCY 항목(반입일/반출일/도착지명): 직반입이면 값이 있으면 오류(공란이어야 함)
             for field, col_name in odcy_cols.items():
+                if field == "odcy_code":
+                    continue
                 if _is_not_blank(row.get(field)):
                     errors.append({
                         "row_number": row["row_number"],
