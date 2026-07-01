@@ -98,9 +98,38 @@ def _parse_date(value) -> Optional[str]:
     return s
 
 
+def read_excel_bytes(file_bytes: bytes) -> pd.DataFrame:
+    """업로드된 엑셀 bytes → header=None, dtype=str DataFrame(전 셀 문자열).
+    .xlsx(openpyxl)/.xls(xlrd) 자동 처리. 실패 시 HTML 표로 저장된 '가짜 xls' 폴백.
+    모두 실패하면 사용자 친화적 안내 메시지로 예외.
+    """
+    # 1) 표준 read_excel (내용 기반 엔진 자동 선택)
+    try:
+        return pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
+    except Exception:
+        pass
+    # 2) 명시적 openpyxl (확장자만 xls 인 xlsx 등 대비)
+    try:
+        return pd.read_excel(BytesIO(file_bytes), header=None, dtype=str, engine="openpyxl")
+    except Exception:
+        pass
+    # 3) HTML 표(엑셀로 저장한 HTML) 폴백 — 한국 ERP 내보내기에서 흔함
+    try:
+        tables = pd.read_html(BytesIO(file_bytes), header=None)
+        if tables:
+            return tables[0].astype(str)
+    except Exception:
+        pass
+    raise ValueError(
+        "엑셀 파일을 읽을 수 없습니다. 파일이 손상되었거나, 암호(비밀번호)가 걸려 있거나, "
+        "표준 엑셀 형식이 아닐 수 있습니다. Excel에서 파일을 연 뒤 "
+        "'다른 이름으로 저장 → Excel 통합 문서(.xlsx)' 로 (암호 해제 포함) 다시 저장하여 업로드해 주세요."
+    )
+
+
 def parse_settlement_excel(file_bytes: bytes) -> list[dict]:
     """업로드된 엑셀 파일 파싱. 헤더행 자동 탐지."""
-    df = pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
+    df = read_excel_bytes(file_bytes)
 
     # 헤더 행 탐지: "Cont.Category" 또는 "픽업지" 포함된 행
     header_row_idx = None

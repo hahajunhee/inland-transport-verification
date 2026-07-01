@@ -268,7 +268,8 @@ def _find_data_start(df: pd.DataFrame, col_map: dict, scan_from: int = 0, fallba
 
 def parse_mobis_excel(file_bytes: bytes) -> dict:
     """모비스 검증 엑셀 파싱."""
-    df = pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
+    from app.services.excel_service import read_excel_bytes
+    df = read_excel_bytes(file_bytes)
     # 병합셀 해제(anchor 값으로 채움) — 병합된 헤더 인식 보정
     df = _expand_merged_cells(file_bytes, df)
     col_map, cost_exact, header_start = _find_header_columns(df)

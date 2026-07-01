@@ -109,7 +109,8 @@ def _parse_date_val(val) -> Optional[date]:
 
 
 def parse_checklist_excel(file_bytes: bytes) -> list[dict]:
-    df = pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
+    from app.services.excel_service import read_excel_bytes
+    df = read_excel_bytes(file_bytes)
 
     header_row_idx = None
     for i, row in df.iterrows():
@@ -577,7 +578,8 @@ def _clean_cell(v) -> str:
 
 def parse_added_file(file_bytes: bytes) -> list[dict]:
     """추가 파일에서 (컨테이너, C/Invoice) 목록 추출. 헤더 'CNTR NO.', 'C/INV NO.'."""
-    df = pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
+    from app.services.excel_service import read_excel_bytes
+    df = read_excel_bytes(file_bytes)
     cntr_targets = {"CNTRNO.", "CNTRNO"}
     cinv_targets = {"C/INVNO.", "C/INVNO"}
     header_idx = cntr_col = cinv_col = None
