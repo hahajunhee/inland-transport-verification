@@ -607,10 +607,26 @@ def parse_added_file(file_bytes: bytes) -> list[dict]:
     return out
 
 
+def _norm_key(v) -> str:
+    """대조 키 정규화 (COUNTIFS 처럼 값으로 비교).
+    공백 제거 + 대문자 + 숫자로 저장돼 '12345.0' 처럼 읽힌 값은 정수부만.
+    (엑셀에서 한 파일은 숫자, 다른 파일은 텍스트로 저장돼 '12345' ≠ '12345.0' 이 되는
+     오탐 방지)
+    """
+    s = "" if v is None else str(v).strip()
+    if s in ("nan", "None", "NaT"):
+        return ""
+    if "." in s:
+        head, _dot, tail = s.partition(".")
+        if head.isdigit() and tail.strip("0") == "":
+            s = head          # '12345.0' / '12345.00' → '12345'
+    return s.upper()
+
+
 def check_stage9(current_rows: list[dict], added_rows: list[dict]) -> list[dict]:
     """추가 파일에는 있으나 검증파일에 누락된 (컨테이너+C/I) 조합을 오류로 반환."""
     def key(c, inv):
-        return ((c or "").strip().upper(), (inv or "").strip().upper())
+        return (_norm_key(c), _norm_key(inv))
 
     cur_keys = set()
     for r in current_rows:
