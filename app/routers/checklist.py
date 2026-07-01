@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.services.checklist_service import (
     parse_checklist_excel,
+    extract_verification_keys,
     run_checklist,
     run_stage7,
     run_stage9,
@@ -30,12 +31,13 @@ async def upload_checklist(file: UploadFile = File(...)):
     try:
         content = await file.read()
         rows = parse_checklist_excel(content)
+        all_keys = extract_verification_keys(content)  # Stage 9용 전체 (컨테이너,C/I) — 픽업 공란행 포함
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
         raise HTTPException(400, f"파일 파싱 실패: {e}")
 
-    session = run_checklist(file.filename, rows)
+    session = run_checklist(file.filename, rows, all_keys=all_keys)
 
     error_counts = {}
     for stage_num in ("1", "2", "3", "4", "5", "6", "8"):

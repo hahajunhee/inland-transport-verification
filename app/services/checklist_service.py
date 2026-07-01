@@ -523,7 +523,7 @@ def check_stage8(rows: list[dict]) -> list[dict]:
 
 # ─── 전체 검증 실행 ───────────────────────────────────────────────────
 
-def run_checklist(filename: str, rows: list[dict]) -> dict:
+def run_checklist(filename: str, rows: list[dict], all_keys=None) -> dict:
     _refresh_holiday_set()
     errors = {
         "1": check_stage1(rows),
@@ -544,7 +544,7 @@ def run_checklist(filename: str, rows: list[dict]) -> dict:
         "errors": errors,
     }
 
-    _save_session(session_id, session, rows)
+    _save_session(session_id, session, rows, all_keys=all_keys)
     return session
 
 
@@ -555,7 +555,7 @@ def run_stage7(session_id: int, container_numbers: list[str]) -> list[dict]:
     rows = data.get("rows", [])
     errors = check_stage7(rows, container_numbers)
     data["session"]["errors"]["7"] = errors
-    _save_session(session_id, data["session"], rows)
+    _save_session(session_id, data["session"], rows, all_keys=data.get("all_keys"))
     return errors
 
 
@@ -601,6 +601,43 @@ def parse_added_file(file_bytes: bytes) -> list[dict]:
     for i in range(header_idx + 1, len(df)):
         c = _clean_cell(df.iloc[i, cntr_col])
         inv = _clean_cell(df.iloc[i, cinv_col])
+        if not c and not inv:
+            continue
+        out.append({"container_no": c, "c_invoice_no": inv})
+    return out
+
+
+def extract_verification_keys(file_bytes: bytes) -> list[dict]:
+    """검증파일에서 (컨테이너, C/Invoice) 전체 추출 — 픽업지 공란 행도 포함.
+    Stage 9 누락 대조는 co-pack(한 C/I에 컨테이너 여러 개 → 이어지는 행은 픽업지 공란)
+    처럼 parse_checklist_excel 의 픽업 필터에서 빠진 행까지 봐야 하므로,
+    픽업 필터 없이 컨테이너/C-INV 열만 뽑는다.
+    """
+    from app.services.excel_service import read_excel_bytes
+    df = read_excel_bytes(file_bytes)
+    header_idx = None
+    for i in range(len(df)):
+        vals = [str(v) for v in df.iloc[i].values]
+        if any(col in vals for col in ["Cont.Category", "픽업지", "D/G여부"]):
+            header_idx = i
+            break
+    if header_idx is None:
+        return []
+    header = [str(h).strip() for h in df.iloc[header_idx].values]
+    cont_names = {"Contrainer No.", "Container No."}
+    cinv_names = {"C/Invoice No."}
+    cont_col = cinv_col = None
+    for ci, h in enumerate(header):
+        if h in cont_names and cont_col is None:
+            cont_col = ci
+        if h in cinv_names and cinv_col is None:
+            cinv_col = ci
+    if cont_col is None and cinv_col is None:
+        return []
+    out = []
+    for i in range(header_idx + 1, len(df)):
+        c = _clean_cell(df.iloc[i, cont_col]) if cont_col is not None else ""
+        inv = _clean_cell(df.iloc[i, cinv_col]) if cinv_col is not None else ""
         if not c and not inv:
             continue
         out.append({"container_no": c, "c_invoice_no": inv})
@@ -658,14 +695,16 @@ def run_stage9(session_id: int, file_bytes: bytes) -> dict:
     if not data:
         return {"errors": [], "added_count": 0, "current_count": 0, "missing_count": 0}
     rows = data.get("rows", [])
+    # 픽업 공란 행 포함 전체 키 우선(co-pack 대응). 구 세션(없으면) 파싱된 rows 로 폴백.
+    current_keys = data.get("all_keys") or rows
     added = parse_added_file(file_bytes)
-    errors = check_stage9(rows, added)
+    errors = check_stage9(current_keys, added)
     data["session"]["errors"]["9"] = errors
-    _save_session(session_id, data["session"], rows)
+    _save_session(session_id, data["session"], rows, all_keys=data.get("all_keys"))
     return {
         "errors": errors,
         "added_count": len(added),
-        "current_count": len(rows),
+        "current_count": len(current_keys),
         "missing_count": len(errors),
     }
 
@@ -686,10 +725,12 @@ def _next_session_id() -> int:
     return max(ids, default=0) + 1
 
 
-def _save_session(session_id: int, session: dict, rows: list[dict]):
+def _save_session(session_id: int, session: dict, rows: list[dict], all_keys=None):
     CHECKLIST_DIR.mkdir(parents=True, exist_ok=True)
     path = CHECKLIST_DIR / f"session_{session_id}.json"
     data = {"session": session, "rows": rows}
+    if all_keys is not None:
+        data["all_keys"] = all_keys   # Stage 9용: 픽업 공란 행 포함 전체 (컨테이너, C/I)
     path.write_text(json.dumps(data, ensure_ascii=False, default=str), encoding="utf-8")
 
 
