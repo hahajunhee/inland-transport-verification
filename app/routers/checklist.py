@@ -11,6 +11,7 @@ from app.services.checklist_service import (
     parse_checklist_excel,
     run_checklist,
     run_stage7,
+    run_stage9,
     get_session,
     list_sessions,
     generate_checklist_report,
@@ -62,6 +63,20 @@ async def check_stage7(session_id: int, body: Stage7Request):
         "count": len(errors),
         "total_containers": len([c for c in body.container_numbers if c.strip()]),
     }
+
+
+@router.post("/stage9/{session_id}")
+async def check_stage9(session_id: int, file: UploadFile = File(...)):
+    """추가 파일(선택)을 검증파일과 대조하여 누락 행을 찾는다."""
+    if not file.filename.endswith((".xlsx", ".xls")):
+        raise HTTPException(400, "엑셀 파일(.xlsx, .xls)만 지원합니다.")
+    content = await file.read()
+    try:
+        return run_stage9(session_id, content)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"추가 파일 처리 실패: {e}")
 
 
 @router.get("/sessions")

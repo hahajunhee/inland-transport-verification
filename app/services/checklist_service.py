@@ -558,6 +558,100 @@ def run_stage7(session_id: int, container_numbers: list[str]) -> list[dict]:
     return errors
 
 
+# ─── Stage 9: 추가 파일 대조 (누락 검증) ──────────────────────────────
+# 추가 파일(선택)의 "CNTR NO." + "C/INV NO." 와 검증파일의
+# "Contrainer No." + "C/Invoice No." 를 키로 대조하여, 추가 파일에는 있으나
+# 검증파일에 없는(누락된) 조합을 찾는다. (추가 파일 행수 ≥ 검증파일, 같으면 정상)
+
+def _norm_hdr(v) -> str:
+    """헤더 비교용: 모든 공백 제거 + 대문자."""
+    return "".join(str(v).split()).upper()
+
+
+def _clean_cell(v) -> str:
+    if v is None:
+        return ""
+    s = str(v).strip()
+    return "" if s in ("nan", "None", "NaT") else s
+
+
+def parse_added_file(file_bytes: bytes) -> list[dict]:
+    """추가 파일에서 (컨테이너, C/Invoice) 목록 추출. 헤더 'CNTR NO.', 'C/INV NO.'."""
+    df = pd.read_excel(BytesIO(file_bytes), header=None, dtype=str)
+    cntr_targets = {"CNTRNO.", "CNTRNO"}
+    cinv_targets = {"C/INVNO.", "C/INVNO"}
+    header_idx = cntr_col = cinv_col = None
+    for i in range(min(30, len(df))):
+        rc = ri = None
+        for ci in range(len(df.columns)):
+            v = _norm_hdr(df.iloc[i, ci])
+            if v in cntr_targets:
+                rc = ci
+            elif v in cinv_targets:
+                ri = ci
+        if rc is not None and ri is not None:
+            header_idx, cntr_col, cinv_col = i, rc, ri
+            break
+    if header_idx is None:
+        raise ValueError("추가 파일에서 'CNTR NO.' 와 'C/INV NO.' 열을 찾을 수 없습니다.")
+
+    out = []
+    for i in range(header_idx + 1, len(df)):
+        c = _clean_cell(df.iloc[i, cntr_col])
+        inv = _clean_cell(df.iloc[i, cinv_col])
+        if not c and not inv:
+            continue
+        out.append({"container_no": c, "c_invoice_no": inv})
+    return out
+
+
+def check_stage9(current_rows: list[dict], added_rows: list[dict]) -> list[dict]:
+    """추가 파일에는 있으나 검증파일에 누락된 (컨테이너+C/I) 조합을 오류로 반환."""
+    def key(c, inv):
+        return ((c or "").strip().upper(), (inv or "").strip().upper())
+
+    cur_keys = set()
+    for r in current_rows:
+        k = key(r.get("container_no"), r.get("c_invoice_no"))
+        if k != ("", ""):
+            cur_keys.add(k)
+
+    errors = []
+    seen = set()
+    for r in added_rows:
+        k = key(r.get("container_no"), r.get("c_invoice_no"))
+        if k == ("", "") or k in cur_keys or k in seen:
+            continue
+        seen.add(k)
+        cn = r.get("container_no") or "-"
+        ci = r.get("c_invoice_no") or "-"
+        errors.append({
+            "row_number": None,
+            "container_no": r.get("container_no"),
+            "column": "C/INV NO.",
+            "value": r.get("c_invoice_no"),
+            "reason": f"추가 파일에는 있으나 검증파일에 누락됨 (CNTR {cn} / C/INV {ci})",
+        })
+    return errors
+
+
+def run_stage9(session_id: int, file_bytes: bytes) -> dict:
+    data = _load_session(session_id)
+    if not data:
+        return {"errors": [], "added_count": 0, "current_count": 0, "missing_count": 0}
+    rows = data.get("rows", [])
+    added = parse_added_file(file_bytes)
+    errors = check_stage9(rows, added)
+    data["session"]["errors"]["9"] = errors
+    _save_session(session_id, data["session"], rows)
+    return {
+        "errors": errors,
+        "added_count": len(added),
+        "current_count": len(rows),
+        "missing_count": len(errors),
+    }
+
+
 # ─── 세션 저장/로드 ───────────────────────────────────────────────────
 
 def _next_session_id() -> int:
@@ -618,6 +712,7 @@ STAGE_NAMES = {
     "6": "일자 순서 체크",
     "7": "직상차 체크",
     "8": "C/Invoice No. 도착지명 정합성 체크",
+    "9": "추가 파일 대조 (누락 검증)",
 }
 
 _FILL_HEADER = PatternFill("solid", fgColor="1A73E8")
@@ -644,7 +739,7 @@ def generate_checklist_report(session: dict) -> bytes:
         cell.alignment = Alignment(horizontal="center")
 
     total_errors = 0
-    for stage_num in ("1", "2", "3", "4", "5", "6", "7", "8"):
+    for stage_num in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
         stage_errors = errors.get(stage_num, [])
         count = len(stage_errors)
         total_errors += count
@@ -666,7 +761,7 @@ def generate_checklist_report(session: dict) -> bytes:
         cell.font = _FONT_HEADER
         cell.alignment = Alignment(horizontal="center")
 
-    for stage_num in ("1", "2", "3", "4", "5", "6", "7", "8"):
+    for stage_num in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
         stage_errors = errors.get(stage_num, [])
         for err in stage_errors:
             ws2.append([
