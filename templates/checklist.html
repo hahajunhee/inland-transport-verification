@@ -465,10 +465,11 @@ function createStageCard(stageNum, meta, errors) {
 function renderErrorTable(errors) {
   if (!errors || errors.length === 0) return '<p style="color:#16a34a;font-size:13px">오류가 없습니다.</p>';
   let html = `<div class="cl-error-scroll"><table class="cl-error-table"><thead><tr>
-    <th>행번호</th><th>컨테이너번호</th><th>열</th><th>현재값</th><th>오류 사유</th>
+    <th>Freight Doc</th><th>행번호</th><th>컨테이너번호</th><th>열</th><th>현재값</th><th>오류 사유</th>
   </tr></thead><tbody>`;
   for (const e of errors) {
     html += `<tr>
+      <td>${e.freight_doc || '-'}</td>
       <td>${e.row_number || '-'}</td>
       <td>${e.container_no || '-'}</td>
       <td>${e.column || ''}</td>

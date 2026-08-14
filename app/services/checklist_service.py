@@ -35,6 +35,7 @@ CHECKLIST_COLUMN_MAP = {
     "Container No.":        "container_no",
     "C/Invoice No.":        "c_invoice_no",
     "FWO Doc.":             "fwo_doc",
+    "Freight Doc":          "freight_doc",
     "Quantity":             "quantity",
     "Weekend / Holiday":    "weekend_holiday",
     "ODCY 반입일":          "odcy_in_date",
@@ -523,6 +524,19 @@ def check_stage8(rows: list[dict]) -> list[dict]:
 
 # ─── 전체 검증 실행 ───────────────────────────────────────────────────
 
+def _attach_freight_doc(errors: list[dict], rows: list[dict]) -> list[dict]:
+    """각 오류에 해당 행의 'Freight Doc' 값을 부착(행번호로 매칭). 없으면 빈값."""
+    fd_map = {}
+    for r in rows:
+        rn = r.get("row_number")
+        if rn is not None:
+            fd_map[rn] = r.get("freight_doc") or ""
+    for e in errors:
+        rn = e.get("row_number")
+        e["freight_doc"] = fd_map.get(rn, "") if rn is not None else ""
+    return errors
+
+
 def run_checklist(filename: str, rows: list[dict], all_keys=None) -> dict:
     _refresh_holiday_set()
     errors = {
@@ -534,6 +548,8 @@ def run_checklist(filename: str, rows: list[dict], all_keys=None) -> dict:
         "6": check_stage6(rows),
         "8": check_stage8(rows),
     }
+    for _stage_errs in errors.values():
+        _attach_freight_doc(_stage_errs, rows)
 
     session_id = _next_session_id()
     session = {
@@ -554,6 +570,7 @@ def run_stage7(session_id: int, container_numbers: list[str]) -> list[dict]:
         return []
     rows = data.get("rows", [])
     errors = check_stage7(rows, container_numbers)
+    _attach_freight_doc(errors, rows)
     data["session"]["errors"]["7"] = errors
     _save_session(session_id, data["session"], rows, all_keys=data.get("all_keys"))
     return errors
@@ -699,6 +716,7 @@ def run_stage9(session_id: int, file_bytes: bytes) -> dict:
     current_keys = data.get("all_keys") or rows
     added = parse_added_file(file_bytes)
     errors = check_stage9(current_keys, added)
+    _attach_freight_doc(errors, rows)   # 누락 행은 검증파일에 없으므로 대부분 빈값
     data["session"]["errors"]["9"] = errors
     _save_session(session_id, data["session"], rows, all_keys=data.get("all_keys"))
     return {
@@ -813,7 +831,7 @@ def generate_checklist_report(session: dict) -> bytes:
 
     # ── 전체 오류 시트 ──
     ws2 = wb.create_sheet("전체 오류 목록")
-    detail_headers = ["Stage", "검증 항목", "행번호", "컨테이너번호", "열", "현재값", "오류 사유"]
+    detail_headers = ["Stage", "검증 항목", "Freight Doc", "행번호", "컨테이너번호", "열", "현재값", "오류 사유"]
     ws2.append(detail_headers)
     for cell in ws2[1]:
         cell.fill = _FILL_HEADER
@@ -826,6 +844,7 @@ def generate_checklist_report(session: dict) -> bytes:
             ws2.append([
                 f"Stage {stage_num}",
                 STAGE_NAMES.get(stage_num, ""),
+                err.get("freight_doc", ""),
                 err.get("row_number"),
                 err.get("container_no"),
                 err.get("column"),
@@ -834,12 +853,12 @@ def generate_checklist_report(session: dict) -> bytes:
             ])
             ws2[ws2.max_row][0].fill = _FILL_ERROR
 
-    widths = [12, 25, 10, 18, 20, 15, 55]
+    widths = [12, 25, 18, 10, 18, 20, 15, 55]
     for i, w in enumerate(widths, 1):
         ws2.column_dimensions[get_column_letter(i)].width = w
 
     ws2.freeze_panes = "A2"
-    ws2.auto_filter.ref = f"A1:G{ws2.max_row}"
+    ws2.auto_filter.ref = f"A1:H{ws2.max_row}"
 
     buf = BytesIO()
     wb.save(buf)
